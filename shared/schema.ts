@@ -162,6 +162,7 @@ export const products = pgTable("products", {
   unit: varchar("unit", { length: 20 }).notNull(),
   salePrice: decimal("sale_price", { precision: 15, scale: 2 }).notNull(),
   costPrice: decimal("cost_price", { precision: 15, scale: 2 }).notNull(),
+  quantityOnHand: decimal("quantity_on_hand", { precision: 15, scale: 3 }).notNull().default("0"), // الكمية المتوفرة في المخزون
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -169,6 +170,7 @@ export const products = pgTable("products", {
 export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   createdAt: true,
+  quantityOnHand: true, // يتم تحديثه تلقائياً من خلال حركات المخزون
 }).extend({
   itemCode: z.string().min(1, "كود الصنف مطلوب"),
   itemName: z.string().min(1, "اسم الصنف مطلوب"),
@@ -219,3 +221,134 @@ export const insertCustomerSchema = createInsertSchema(customers).omit({
 // أنواع TypeScript - العملاء
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type Customer = typeof customers.$inferSelect;
+
+// حالة الفاتورة
+export type InvoiceStatus = "مسودة" | "منشورة";
+
+// جدول فواتير المبيعات
+export const salesInvoices = pgTable("sales_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
+  invoiceDate: timestamp("invoice_date").notNull(),
+  customerId: varchar("customer_id").notNull(), // foreign key → customers.id
+  totalBeforeTax: decimal("total_before_tax", { precision: 15, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).notNull().default("0.15"), // معدل الضريبة (15%)
+  taxAmount: decimal("tax_amount", { precision: 15, scale: 2 }).notNull(),
+  totalAfterTax: decimal("total_after_tax", { precision: 15, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 15, scale: 2 }).notNull().default("0"), // إجمالي التكلفة
+  status: varchar("status", { length: 20 }).notNull().default("مسودة").$type<InvoiceStatus>(), // حالة الفاتورة
+  notes: text("notes"),
+  entryId: varchar("entry_id"), // القيد المحاسبي المرتبط (قيد الإيرادات) - يُنشأ عند النشر
+  costEntryId: varchar("cost_entry_id"), // قيد التكلفة - يُنشأ عند النشر
+  postedAt: timestamp("posted_at"), // تاريخ النشر
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// جدول تفاصيل فواتير المبيعات (الأصناف)
+export const salesInvoiceItems = pgTable("sales_invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull(), // foreign key → sales_invoices.id
+  productId: varchar("product_id").notNull(), // foreign key → products.id
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  unitPrice: decimal("unit_price", { precision: 15, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 15, scale: 2 }).notNull(), // = quantity * unitPrice
+  costPrice: decimal("cost_price", { precision: 15, scale: 2 }).notNull(), // سعر التكلفة لحظة البيع
+  totalCost: decimal("total_cost", { precision: 15, scale: 2 }).notNull(), // = quantity * costPrice
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// جدول حركات المخزون (Stock Movements)
+export const stockMovements = pgTable("stock_movements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull(), // foreign key → products.id
+  movementType: varchar("movement_type", { length: 50 }).notNull(), // نوع الحركة: "فاتورة مبيعات", "فاتورة مشتريات", "جرد", etc.
+  referenceId: varchar("reference_id").notNull(), // معرف المستند المصدر (invoice_id, etc.)
+  referenceNumber: varchar("reference_number", { length: 50 }).notNull(), // رقم المستند المصدر
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(), // كمية موجبة للدخول، سالبة للخروج
+  quantityBefore: decimal("quantity_before", { precision: 15, scale: 3 }).notNull(), // الكمية قبل الحركة
+  quantityAfter: decimal("quantity_after", { precision: 15, scale: 3 }).notNull(), // الكمية بعد الحركة
+  movementDate: timestamp("movement_date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Schema للإدراج - فواتير المبيعات
+export const insertSalesInvoiceSchema = createInsertSchema(salesInvoices).omit({
+  id: true,
+  createdAt: true,
+  entryId: true,
+  costEntryId: true,
+  postedAt: true,
+  totalBeforeTax: true, // يتم حسابه تلقائياً
+  taxAmount: true, // يتم حسابه تلقائياً
+  totalAfterTax: true, // يتم حسابه تلقائياً
+  totalCost: true, // يتم حسابه تلقائياً
+}).extend({
+  invoiceNumber: z.string().min(1, "رقم الفاتورة مطلوب"),
+  invoiceDate: z.string().or(z.date()),
+  customerId: z.string().min(1, "العميل مطلوب"),
+  taxRate: z.string().or(z.number()).default("0.15"),
+  status: z.enum(["مسودة", "منشورة"]).default("مسودة"),
+  notes: z.string().optional(),
+});
+
+// Schema للإدراج - تفاصيل فواتير المبيعات
+export const insertSalesInvoiceItemSchema = createInsertSchema(salesInvoiceItems).omit({
+  id: true,
+  createdAt: true,
+  total: true, // يتم حسابه تلقائياً: quantity * unitPrice
+  totalCost: true, // يتم حسابه تلقائياً: quantity * costPrice
+}).extend({
+  invoiceId: z.string().min(1),
+  productId: z.string().min(1, "الصنف مطلوب"),
+  quantity: z.string().or(z.number()).refine(val => parseFloat(val.toString()) > 0, "الكمية يجب أن تكون أكبر من صفر"),
+  unitPrice: z.string().or(z.number()),
+  costPrice: z.string().or(z.number()),
+});
+
+// Schema للفاتورة الكاملة مع الأصناف
+export const insertFullSalesInvoiceSchema = z.object({
+  invoiceNumber: z.string().min(1, "رقم الفاتورة مطلوب"),
+  invoiceDate: z.string().or(z.date()),
+  customerId: z.string().min(1, "العميل مطلوب"),
+  taxRate: z.string().or(z.number()).default("0.15"),
+  notes: z.string().optional(),
+  items: z.array(
+    z.object({
+      productId: z.string().min(1, "الصنف مطلوب"),
+      quantity: z.string().or(z.number()).refine(val => parseFloat(val.toString()) > 0, "الكمية يجب أن تكون أكبر من صفر"),
+      unitPrice: z.string().or(z.number()),
+    })
+  ).min(1, "يجب إضافة صنف واحد على الأقل"),
+});
+
+// Schema للإدراج - حركات المخزون
+export const insertStockMovementSchema = createInsertSchema(stockMovements).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  productId: z.string().min(1),
+  movementType: z.string().min(1),
+  referenceId: z.string().min(1),
+  referenceNumber: z.string().min(1),
+  quantity: z.string().or(z.number()),
+  quantityBefore: z.string().or(z.number()),
+  quantityAfter: z.string().or(z.number()),
+  movementDate: z.string().or(z.date()),
+  notes: z.string().optional(),
+});
+
+// أنواع TypeScript - فواتير المبيعات
+export type InsertSalesInvoice = z.infer<typeof insertSalesInvoiceSchema>;
+export type SalesInvoice = typeof salesInvoices.$inferSelect;
+export type InsertSalesInvoiceItem = z.infer<typeof insertSalesInvoiceItemSchema>;
+export type SalesInvoiceItem = typeof salesInvoiceItems.$inferSelect;
+export type InsertFullSalesInvoice = z.infer<typeof insertFullSalesInvoiceSchema>;
+export type InsertStockMovement = z.infer<typeof insertStockMovementSchema>;
+export type StockMovement = typeof stockMovements.$inferSelect;
+
+// نوع للفاتورة الكاملة مع التفاصيل
+export type FullSalesInvoice = SalesInvoice & {
+  items: (SalesInvoiceItem & { productName?: string; unit?: string })[];
+  customerName?: string;
+};
