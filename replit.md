@@ -62,11 +62,16 @@ The system is built as a monolithic ERP application with a modular design, featu
     - 37+ data-testid attributes for E2E testing automation
   - **E2E Tested**: Full workflow verified (draft creation → posting → accounting → balance updates)
   
-- ✅ **Sidebar Navigation**: Created "البيانات الأساسية" (Master Data) section in sidebar for shared data management
-  - Customers management (إدارة بيانات العملاء) → `/master/customers`
-  - Suppliers management (إدارة بيانات الموردين) → `/master/suppliers`
-  - Branches (الفروع) → `/master/branches`
-  - Currencies (العملات) → `/master/currencies`
+- ✅ **Sidebar Navigation**: Organized navigation with clear module hierarchy
+  - **البيانات الأساسية** (Master Data) section for shared data:
+    - Customers management → `/master/customers`
+    - Suppliers management → `/master/suppliers`
+    - Branches → `/master/branches`
+    - Currencies → `/master/currencies`
+  - **النقدية والبنوك** (Cash & Bank) section includes Receipt Vouchers:
+    - Receipt Vouchers (سندات القبض) → `/cash-bank/receipt-vouchers`
+    - Bank Accounts → `/cash-bank/bank-accounts`
+    - Cash Boxes → `/cash-bank/cash-boxes`
   
 - ✅ **UI/UX Improvements**:
   - Fixed sidebar layout using Shadcn's `SidebarInset` component to prevent content overlay
