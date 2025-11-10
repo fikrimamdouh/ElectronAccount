@@ -163,11 +163,6 @@ const menuItems: MenuItem[] = [
             icon: FileCheck,
           },
           {
-            title: "سندات القبض",
-            url: "/accounting/receipts",
-            icon: Receipt,
-          },
-          {
             title: "سندات الصرف",
             url: "/accounting/payments",
             icon: DollarSign,
@@ -390,7 +385,7 @@ const menuItems: MenuItem[] = [
       },
       {
         title: "سندات القبض",
-        url: "/cash-bank/receipts",
+        url: "/cash-bank/receipt-vouchers",
         icon: Receipt,
       },
       {
