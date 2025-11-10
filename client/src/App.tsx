@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -212,6 +212,10 @@ function Router() {
       <Route path="/accounting/fiscal-periods" component={FiscalPeriods} />
       <Route path="/accounting/cost-centers" component={CostCenters} />
       <Route path="/accounting/chart-of-accounts" component={ChartOfAccounts} />
+      <Route path="/master/customers" component={Customers} />
+      <Route path="/master/suppliers" component={Suppliers} />
+      <Route path="/master/branches" component={Branches} />
+      <Route path="/master/currencies" component={Currencies} />
       
       {/* Transactions */}
       <Route path="/accounting/journal-entries" component={JournalEntries} />
@@ -440,18 +444,16 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <div className="flex flex-col flex-1">
-              <header className="flex items-center justify-between p-4 border-b border-border">
-                <ThemeToggle />
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-              </header>
-              <main className="flex-1 overflow-auto p-6">
-                <Router />
-              </main>
-            </div>
-            <AppSidebar />
-          </div>
+          <AppSidebar />
+          <SidebarInset>
+            <header className="flex items-center justify-between p-4 border-b border-border">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <ThemeToggle />
+            </header>
+            <main className="flex-1 overflow-auto p-6">
+              <Router />
+            </main>
+          </SidebarInset>
         </SidebarProvider>
         <Toaster />
       </TooltipProvider>

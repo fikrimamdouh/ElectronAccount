@@ -105,31 +105,53 @@ const menuItems: MenuItem[] = [
     icon: LayoutDashboard,
   },
   
+  // البيانات الأساسية المشتركة
+  {
+    title: "البيانات الأساسية",
+    icon: Database,
+    items: [
+      {
+        title: "إدارة بيانات العملاء",
+        url: "/master/customers",
+        icon: Users,
+      },
+      {
+        title: "إدارة بيانات الموردين",
+        url: "/master/suppliers",
+        icon: Truck,
+      },
+      {
+        title: "الفروع",
+        url: "/master/branches",
+        icon: Building2,
+      },
+      {
+        title: "العملات",
+        url: "/master/currencies",
+        icon: Coins,
+      },
+    ],
+  },
+  
   // 1. المحاسبة المالية
   {
     title: "المحاسبة المالية",
     icon: Calculator,
     items: [
       {
-        title: "البيانات الأساسية",
-        icon: Database,
-        items: [
-          {
-            title: "دليل الحسابات",
-            url: "/accounting/chart-of-accounts",
-            icon: BookOpen,
-          },
-          {
-            title: "مراكز التكلفة",
-            url: "/accounting/cost-centers",
-            icon: Target,
-          },
-          {
-            title: "الفترات المالية",
-            url: "/accounting/fiscal-periods",
-            icon: Calendar,
-          },
-        ],
+        title: "دليل الحسابات",
+        url: "/accounting/chart-of-accounts",
+        icon: BookOpen,
+      },
+      {
+        title: "مراكز التكلفة",
+        url: "/accounting/cost-centers",
+        icon: Target,
+      },
+      {
+        title: "الفترات المالية",
+        url: "/accounting/fiscal-periods",
+        icon: Calendar,
       },
       {
         title: "القيود والحركات",
@@ -985,7 +1007,7 @@ function SubMenuItem({ item, location }: { item: MenuItem; location: string }) {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <SidebarMenuSub>
-              {item.items.map((subItem) => (
+              {item.items?.map((subItem) => (
                 <SubMenuItem key={subItem.title} item={subItem} location={location} />
               ))}
             </SidebarMenuSub>
@@ -1036,7 +1058,7 @@ function NavMenuItem({ item }: { item: MenuItem }) {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <SidebarMenuSub>
-              {item.items.map((subItem) => (
+              {item.items?.map((subItem) => (
                 <SubMenuItem key={subItem.title} item={subItem} location={location} />
               ))}
             </SidebarMenuSub>
