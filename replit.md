@@ -10,13 +10,31 @@ The user prefers clear and concise communication. They appreciate an iterative d
 The system is built as a monolithic ERP application with a modular design, featuring 23+ core modules plus company settings.
 
 **Recent Development Progress (November 2025):**
-- ✅ **Products Management (Items)**: Complete CRUD system for inventory items with unit selection (حبة, كرتون, كيلو), sale price, and cost price tracking.
-- ✅ **Customer Management**: Fully integrated customer management with automatic chart of accounts linkage, balance tracking, and Zakat/Tax compliance (tax number field).
+- ✅ **Products Management (بطاقة الصنف)**: Complete CRUD system for inventory items with unit selection (حبة, كرتون, كيلو), sale price, and cost price tracking.
+  - Full form validation using Zod schemas
+  - Data table with loading/error states
+  - Toast notifications for all operations
+  - Real-time data updates with TanStack Query
+  
+- ✅ **Customer Management (إدارة بيانات العملاء)**: Fully integrated customer management with automatic chart of accounts linkage, balance tracking, and Zakat/Tax compliance (tax number field).
   - Automatic account creation in chart of accounts (code: 1120-{customer_code})
   - Opening balance support with automatic ledger integration
-  - Transaction-safe operations ensuring data integrity
-  - Real-time balance tracking with color-coded display
-  - Comprehensive error handling with loading/error states
+  - Transaction-safe operations using PostgreSQL transactions ensuring data integrity
+  - Cannot delete customers with non-zero account balances (throws descriptive Arabic error)
+  - Real-time balance tracking with color-coded display (green for debit, red for credit)
+  - Comprehensive error handling with loading/error states and retry functionality
+  
+- ✅ **Sidebar Navigation**: Created "البيانات الأساسية" (Master Data) section in sidebar for shared data management
+  - Customers management (إدارة بيانات العملاء) → `/master/customers`
+  - Suppliers management (إدارة بيانات الموردين) → `/master/suppliers`
+  - Branches (الفروع) → `/master/branches`
+  - Currencies (العملات) → `/master/currencies`
+  
+- ✅ **UI/UX Improvements**:
+  - Fixed sidebar layout using Shadcn's `SidebarInset` component to prevent content overlay
+  - Proper RTL layout with sidebar on the right side
+  - TypeScript errors resolved in sidebar navigation
+  - All 23+ modules properly routed in App.tsx
 
 **UI/UX Decisions:**
 - **Language & Layout:** Full Arabic interface with comprehensive RTL (Right-to-Left) support.
