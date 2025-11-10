@@ -26,6 +26,32 @@ import {
   ArrowRightLeft,
   ChevronDown,
   ChevronLeft,
+  Package,
+  ShoppingCart,
+  FileBarChart,
+  ClipboardList,
+  PackageCheck,
+  RotateCcw,
+  ShoppingBag,
+  FileOutput,
+  PackageX,
+  CreditCard,
+  Wallet,
+  Banknote,
+  ArrowLeftRight,
+  UserCircle,
+  Clock,
+  HardDrive,
+  Wrench,
+  TrendingDown,
+  MonitorPlay,
+  FolderKanban,
+  Factory,
+  FileSignature,
+  Store,
+  TruckIcon,
+  MessageSquare,
+  Award,
 } from "lucide-react";
 import {
   Sidebar,
@@ -60,206 +86,576 @@ const menuItems: MenuItem[] = [
     url: "/",
     icon: LayoutDashboard,
   },
+  
+  // 1. المحاسبة المالية
   {
-    title: "البيانات الأساسية",
-    icon: Database,
+    title: "المحاسبة المالية",
+    icon: Calculator,
     items: [
       {
-        title: "أكواد النظام",
-        icon: Settings,
+        title: "البيانات الأساسية",
+        icon: Database,
         items: [
           {
+            title: "دليل الحسابات",
+            url: "/accounting/chart-of-accounts",
+            icon: BookOpen,
+          },
+          {
+            title: "مراكز التكلفة",
+            url: "/accounting/cost-centers",
+            icon: Target,
+          },
+          {
             title: "الفترات المالية",
-            url: "/master/system-codes/fiscal-periods",
+            url: "/accounting/fiscal-periods",
             icon: Calendar,
-          },
-          {
-            title: "الفروع",
-            url: "/master/system-codes/branches",
-            icon: Building2,
-          },
-          {
-            title: "العملات",
-            url: "/master/system-codes/currencies",
-            icon: Coins,
           },
         ],
       },
       {
-        title: "دليل الحسابات",
-        url: "/master/chart-of-accounts",
-        icon: BookOpen,
+        title: "القيود والحركات",
+        icon: FileText,
+        items: [
+          {
+            title: "قيود اليومية",
+            url: "/accounting/journal-entries",
+            icon: FileCheck,
+          },
+          {
+            title: "سندات القبض",
+            url: "/accounting/receipts",
+            icon: Receipt,
+          },
+          {
+            title: "سندات الصرف",
+            url: "/accounting/payments",
+            icon: DollarSign,
+          },
+        ],
       },
       {
-        title: "مراكز التكلفة",
-        url: "/master/cost-centers",
-        icon: Target,
-      },
-      {
-        title: "بيانات العملاء",
-        url: "/master/customers",
-        icon: UserPlus,
-      },
-      {
-        title: "بيانات الموردين",
-        url: "/master/suppliers",
-        icon: Truck,
-      },
-    ],
-  },
-  {
-    title: "الحركات اليومية",
-    icon: FileText,
-    items: [
-      {
-        title: "قيود اليومية العامة",
-        url: "/transactions/journal-entries",
-        icon: FileCheck,
-      },
-      {
-        title: "سندات القبض",
-        url: "/transactions/receipts",
-        icon: Receipt,
-      },
-      {
-        title: "سندات الصرف",
-        url: "/transactions/payments",
-        icon: DollarSign,
-      },
-    ],
-  },
-  {
-    title: "التقارير",
-    icon: BarChart3,
-    items: [
-      {
-        title: "تقارير الأستاذ العام",
-        icon: FileSpreadsheet,
+        title: "التقارير المالية",
+        icon: BarChart3,
         items: [
           {
             title: "ميزان المراجعة",
-            url: "/reports/general-ledger/trial-balance",
+            url: "/accounting/reports/trial-balance",
             icon: Calculator,
           },
           {
-            title: "كشف حساب أستاذ",
-            url: "/reports/general-ledger/ledger-account",
-            icon: FileText,
-          },
-        ],
-      },
-      {
-        title: "تقارير الأستاذ المساعد",
-        icon: Users,
-        items: [
-          {
-            title: "أرصدة العملاء",
-            url: "/reports/subsidiary-ledger/customer-balances",
-            icon: UserPlus,
-          },
-          {
-            title: "كشف حساب عميل",
-            url: "/reports/subsidiary-ledger/customer-statement",
-            icon: FileCheck,
-          },
-        ],
-      },
-      {
-        title: "تقارير مراكز التكلفة",
-        url: "/reports/cost-centers",
-        icon: Target,
-      },
-      {
-        title: "القوائم المالية",
-        icon: PieChart,
-        items: [
-          {
             title: "قائمة الدخل",
-            url: "/reports/financial-statements/income-statement",
+            url: "/accounting/reports/income-statement",
             icon: TrendingUp,
           },
           {
             title: "الميزانية العمومية",
-            url: "/reports/financial-statements/balance-sheet",
+            url: "/accounting/reports/balance-sheet",
             icon: Landmark,
+          },
+          {
+            title: "التدفقات النقدية",
+            url: "/accounting/reports/cash-flow",
+            icon: Banknote,
           },
         ],
       },
     ],
   },
+
+  // 2. إدارة المخزون
   {
-    title: "عمليات نهاية الفترة",
-    icon: Lock,
+    title: "إدارة المخزون",
+    icon: Package,
     items: [
       {
-        title: "إقفال القيود",
-        url: "/closing/close-entries",
-        icon: Lock,
+        title: "الأصناف",
+        url: "/inventory/items",
+        icon: PackageCheck,
       },
       {
-        title: "ترحيل الأرصدة",
-        url: "/closing/transfer-balances",
-        icon: ArrowRightLeft,
+        title: "المخازن",
+        url: "/inventory/warehouses",
+        icon: Building2,
+      },
+      {
+        title: "حركات المخزون",
+        url: "/inventory/movements",
+        icon: ArrowLeftRight,
+      },
+      {
+        title: "الجرد",
+        url: "/inventory/stock-count",
+        icon: ClipboardList,
+      },
+      {
+        title: "التقارير",
+        icon: FileBarChart,
+        items: [
+          {
+            title: "أرصدة المخزون",
+            url: "/inventory/reports/stock-balance",
+            icon: Package,
+          },
+          {
+            title: "حركة الأصناف",
+            url: "/inventory/reports/item-movement",
+            icon: RotateCcw,
+          },
+        ],
       },
     ],
   },
+
+  // 3. المبيعات والعملاء
+  {
+    title: "المبيعات والعملاء",
+    icon: ShoppingCart,
+    items: [
+      {
+        title: "بيانات العملاء",
+        url: "/sales/customers",
+        icon: UserPlus,
+      },
+      {
+        title: "عروض الأسعار",
+        url: "/sales/quotations",
+        icon: FileText,
+      },
+      {
+        title: "أوامر البيع",
+        url: "/sales/orders",
+        icon: ShoppingBag,
+      },
+      {
+        title: "فواتير المبيعات",
+        url: "/sales/invoices",
+        icon: FileCheck,
+      },
+      {
+        title: "مرتجعات المبيعات",
+        url: "/sales/returns",
+        icon: PackageX,
+      },
+      {
+        title: "التقارير",
+        icon: FileBarChart,
+        items: [
+          {
+            title: "تقرير المبيعات",
+            url: "/sales/reports/sales-report",
+            icon: TrendingUp,
+          },
+          {
+            title: "أرصدة العملاء",
+            url: "/sales/reports/customer-balances",
+            icon: Users,
+          },
+        ],
+      },
+    ],
+  },
+
+  // 4. المشتريات والموردين
+  {
+    title: "المشتريات والموردين",
+    icon: Truck,
+    items: [
+      {
+        title: "بيانات الموردين",
+        url: "/purchasing/suppliers",
+        icon: Truck,
+      },
+      {
+        title: "طلبات الشراء",
+        url: "/purchasing/purchase-orders",
+        icon: ClipboardList,
+      },
+      {
+        title: "استلام البضاعة",
+        url: "/purchasing/goods-receipt",
+        icon: PackageCheck,
+      },
+      {
+        title: "فواتير المشتريات",
+        url: "/purchasing/invoices",
+        icon: FileCheck,
+      },
+      {
+        title: "مرتجعات المشتريات",
+        url: "/purchasing/returns",
+        icon: RotateCcw,
+      },
+      {
+        title: "التقارير",
+        icon: FileBarChart,
+        items: [
+          {
+            title: "تقرير المشتريات",
+            url: "/purchasing/reports/purchase-report",
+            icon: TrendingDown,
+          },
+          {
+            title: "أرصدة الموردين",
+            url: "/purchasing/reports/supplier-balances",
+            icon: Truck,
+          },
+        ],
+      },
+    ],
+  },
+
+  // 5. نقاط البيع (POS)
+  {
+    title: "نقاط البيع",
+    icon: MonitorPlay,
+    items: [
+      {
+        title: "شاشة البيع",
+        url: "/pos/sale-screen",
+        icon: MonitorPlay,
+      },
+      {
+        title: "الفواتير اليومية",
+        url: "/pos/daily-invoices",
+        icon: FileCheck,
+      },
+      {
+        title: "تقارير المبيعات",
+        url: "/pos/reports",
+        icon: FileBarChart,
+      },
+      {
+        title: "إدارة الورديات",
+        url: "/pos/shifts",
+        icon: Clock,
+      },
+    ],
+  },
+
+  // 6. النقدية والبنوك
+  {
+    title: "النقدية والبنوك",
+    icon: Wallet,
+    items: [
+      {
+        title: "الحسابات البنكية",
+        url: "/cash-bank/bank-accounts",
+        icon: Landmark,
+      },
+      {
+        title: "الصناديق",
+        url: "/cash-bank/cash-boxes",
+        icon: Wallet,
+      },
+      {
+        title: "سندات القبض",
+        url: "/cash-bank/receipts",
+        icon: Receipt,
+      },
+      {
+        title: "سندات الصرف",
+        url: "/cash-bank/payments",
+        icon: CreditCard,
+      },
+      {
+        title: "التسويات البنكية",
+        url: "/cash-bank/reconciliation",
+        icon: ArrowLeftRight,
+      },
+    ],
+  },
+
+  // 7. الموارد البشرية
+  {
+    title: "الموارد البشرية",
+    icon: Users,
+    items: [
+      {
+        title: "بيانات الموظفين",
+        url: "/hr/employees",
+        icon: UserCircle,
+      },
+      {
+        title: "الحضور والانصراف",
+        url: "/hr/attendance",
+        icon: Clock,
+      },
+      {
+        title: "الرواتب",
+        url: "/hr/payroll",
+        icon: Banknote,
+      },
+      {
+        title: "البدلات والاستقطاعات",
+        url: "/hr/allowances-deductions",
+        icon: DollarSign,
+      },
+      {
+        title: "التقارير",
+        icon: FileBarChart,
+        items: [
+          {
+            title: "كشف الرواتب",
+            url: "/hr/reports/payroll-sheet",
+            icon: FileSpreadsheet,
+          },
+          {
+            title: "تقرير الحضور",
+            url: "/hr/reports/attendance",
+            icon: Clock,
+          },
+        ],
+      },
+    ],
+  },
+
+  // 8. الأصول الثابتة
+  {
+    title: "الأصول الثابتة",
+    icon: HardDrive,
+    items: [
+      {
+        title: "تسجيل الأصول",
+        url: "/fixed-assets/register",
+        icon: PackageCheck,
+      },
+      {
+        title: "الإهلاك",
+        url: "/fixed-assets/depreciation",
+        icon: TrendingDown,
+      },
+      {
+        title: "نقل الأصول",
+        url: "/fixed-assets/transfer",
+        icon: ArrowLeftRight,
+      },
+      {
+        title: "استبعاد الأصول",
+        url: "/fixed-assets/disposal",
+        icon: PackageX,
+      },
+      {
+        title: "صيانة الأصول",
+        url: "/fixed-assets/maintenance",
+        icon: Wrench,
+      },
+    ],
+  },
+
+  // 9. إدارة المشاريع
+  {
+    title: "إدارة المشاريع",
+    icon: FolderKanban,
+    items: [
+      {
+        title: "المشاريع",
+        url: "/projects/list",
+        icon: FolderKanban,
+      },
+      {
+        title: "المهام",
+        url: "/projects/tasks",
+        icon: ClipboardList,
+      },
+      {
+        title: "الميزانيات",
+        url: "/projects/budgets",
+        icon: Calculator,
+      },
+      {
+        title: "التقارير",
+        url: "/projects/reports",
+        icon: FileBarChart,
+      },
+    ],
+  },
+
+  // 10. إدارة الإنتاج
+  {
+    title: "إدارة الإنتاج",
+    icon: Factory,
+    items: [
+      {
+        title: "أوامر الإنتاج",
+        url: "/production/orders",
+        icon: ClipboardList,
+      },
+      {
+        title: "وصفات الإنتاج",
+        url: "/production/bom",
+        icon: FileText,
+      },
+      {
+        title: "خطوط الإنتاج",
+        url: "/production/lines",
+        icon: Factory,
+      },
+      {
+        title: "مراقبة الجودة",
+        url: "/production/quality",
+        icon: Award,
+      },
+    ],
+  },
+
+  // 11. إدارة العقود
+  {
+    title: "إدارة العقود",
+    icon: FileSignature,
+    items: [
+      {
+        title: "العقود",
+        url: "/contracts/list",
+        icon: FileSignature,
+      },
+      {
+        title: "التجديدات",
+        url: "/contracts/renewals",
+        icon: RotateCcw,
+      },
+      {
+        title: "التنبيهات",
+        url: "/contracts/alerts",
+        icon: MessageSquare,
+      },
+    ],
+  },
+
+  // 12. التجارة الإلكترونية
+  {
+    title: "التجارة الإلكترونية",
+    icon: Store,
+    items: [
+      {
+        title: "المتجر الإلكتروني",
+        url: "/ecommerce/store",
+        icon: Store,
+      },
+      {
+        title: "الطلبات الإلكترونية",
+        url: "/ecommerce/orders",
+        icon: ShoppingBag,
+      },
+      {
+        title: "المنتجات",
+        url: "/ecommerce/products",
+        icon: Package,
+      },
+      {
+        title: "العملاء",
+        url: "/ecommerce/customers",
+        icon: Users,
+      },
+    ],
+  },
+
+  // 13. النقل والشحن
+  {
+    title: "النقل والشحن",
+    icon: TruckIcon,
+    items: [
+      {
+        title: "شركات الشحن",
+        url: "/shipping/carriers",
+        icon: TruckIcon,
+      },
+      {
+        title: "الشحنات",
+        url: "/shipping/shipments",
+        icon: Package,
+      },
+      {
+        title: "تتبع الشحنات",
+        url: "/shipping/tracking",
+        icon: FileBarChart,
+      },
+    ],
+  },
+
+  // الإعدادات
   {
     title: "الإعدادات",
-    url: "/settings",
     icon: Settings,
+    items: [
+      {
+        title: "بيانات الشركة",
+        url: "/settings/company",
+        icon: Building2,
+      },
+      {
+        title: "الفروع",
+        url: "/settings/branches",
+        icon: Building2,
+      },
+      {
+        title: "العملات",
+        url: "/settings/currencies",
+        icon: Coins,
+      },
+      {
+        title: "المستخدمين والصلاحيات",
+        url: "/settings/users",
+        icon: Users,
+      },
+      {
+        title: "النسخ الاحتياطي",
+        url: "/settings/backup",
+        icon: HardDrive,
+      },
+    ],
   },
 ];
 
-// Render submenu items recursively
-function renderSubMenuItems(items: MenuItem[], location: string): JSX.Element[] {
-  return items.map((subItem) => {
-    const hasChildren = subItem.items && subItem.items.length > 0;
-    const isActive = subItem.url === location;
+// Sub menu item component (for nested items)
+function SubMenuItem({ item, location }: { item: MenuItem; location: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const hasChildren = item.items && item.items.length > 0;
+  const isActive = item.url === location;
 
-    if (hasChildren) {
-      const [isOpen, setIsOpen] = useState(false);
-      
-      return (
-        <Collapsible key={subItem.title} open={isOpen} onOpenChange={setIsOpen}>
-          <SidebarMenuSubItem>
-            <CollapsibleTrigger asChild>
-              <SidebarMenuSubButton
-                data-testid={`button-nav-${subItem.title.replace(/\s+/g, '-')}`}
-              >
-                <subItem.icon className="w-4 h-4" />
-                <span>{subItem.title}</span>
-                {isOpen ? (
-                  <ChevronDown className="w-3 h-3 ms-auto" />
-                ) : (
-                  <ChevronLeft className="w-3 h-3 ms-auto" />
-                )}
-              </SidebarMenuSubButton>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <SidebarMenuSub>
-                {renderSubMenuItems(subItem.items!, location)}
-              </SidebarMenuSub>
-            </CollapsibleContent>
-          </SidebarMenuSubItem>
-        </Collapsible>
-      );
-    }
-
+  if (hasChildren) {
     return (
-      <SidebarMenuSubItem key={subItem.title}>
-        <SidebarMenuSubButton
-          asChild
-          className={isActive ? "bg-sidebar-accent" : ""}
-          data-testid={`link-nav-${subItem.title.replace(/\s+/g, '-')}`}
-        >
-          <Link href={subItem.url!}>
-            <subItem.icon className="w-4 h-4" />
-            <span>{subItem.title}</span>
-          </Link>
-        </SidebarMenuSubButton>
-      </SidebarMenuSubItem>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <SidebarMenuSubItem>
+          <CollapsibleTrigger asChild>
+            <SidebarMenuSubButton
+              data-testid={`button-nav-${item.title.replace(/\s+/g, '-')}`}
+            >
+              <item.icon className="w-4 h-4" />
+              <span>{item.title}</span>
+              {isOpen ? (
+                <ChevronDown className="w-3 h-3 ms-auto" />
+              ) : (
+                <ChevronLeft className="w-3 h-3 ms-auto" />
+              )}
+            </SidebarMenuSubButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarMenuSub>
+              {item.items.map((subItem) => (
+                <SubMenuItem key={subItem.title} item={subItem} location={location} />
+              ))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </SidebarMenuSubItem>
+      </Collapsible>
     );
-  });
+  }
+
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton
+        asChild
+        className={isActive ? "bg-sidebar-accent" : ""}
+        data-testid={`link-nav-${item.title.replace(/\s+/g, '-')}`}
+      >
+        <Link href={item.url!}>
+          <item.icon className="w-4 h-4" />
+          <span>{item.title}</span>
+        </Link>
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  );
 }
 
 function NavMenuItem({ item }: { item: MenuItem }) {
@@ -287,7 +683,9 @@ function NavMenuItem({ item }: { item: MenuItem }) {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <SidebarMenuSub>
-              {renderSubMenuItems(item.items, location)}
+              {item.items.map((subItem) => (
+                <SubMenuItem key={subItem.title} item={subItem} location={location} />
+              ))}
             </SidebarMenuSub>
           </CollapsibleContent>
         </SidebarMenuItem>
@@ -323,13 +721,13 @@ export function AppSidebar() {
             <h1 className="text-xl font-bold" data-testid="text-app-title">
               RinaPro Business
             </h1>
-            <p className="text-xs text-muted-foreground">نظام المحاسبة المتقدم</p>
+            <p className="text-xs text-muted-foreground">نظام ERP المتكامل</p>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>القوائم الرئيسية</SidebarGroupLabel>
+          <SidebarGroupLabel>المديولات الرئيسية</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
