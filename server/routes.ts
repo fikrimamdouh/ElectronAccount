@@ -1,13 +1,236 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import {
+  insertAccountSchema,
+  insertFullEntrySchema,
+  type InsertAccount,
+  type InsertFullEntry,
+} from "@shared/schema";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Accounts Routes
+  app.get("/api/accounts", async (_req, res) => {
+    try {
+      const accounts = await storage.getAccounts();
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      res.status(500).json({ error: "فشل في جلب الحسابات" });
+    }
+  });
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  app.get("/api/accounts/:id", async (req, res) => {
+    try {
+      const account = await storage.getAccount(req.params.id);
+      if (!account) {
+        return res.status(404).json({ error: "الحساب غير موجود" });
+      }
+      res.json(account);
+    } catch (error) {
+      console.error("Error fetching account:", error);
+      res.status(500).json({ error: "فشل في جلب الحساب" });
+    }
+  });
+
+  app.post("/api/accounts", async (req, res) => {
+    try {
+      const validatedData = insertAccountSchema.parse(req.body);
+
+      // Check if account code already exists
+      const existing = await storage.getAccountByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "رمز الحساب موجود بالفعل" });
+      }
+
+      const account = await storage.createAccount(validatedData);
+      res.status(201).json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error creating account:", error);
+      res.status(500).json({ error: "فشل في إنشاء الحساب" });
+    }
+  });
+
+  app.put("/api/accounts/:id", async (req, res) => {
+    try {
+      const validatedData = insertAccountSchema.partial().parse(req.body);
+      const account = await storage.updateAccount(req.params.id, validatedData);
+      
+      if (!account) {
+        return res.status(404).json({ error: "الحساب غير موجود" });
+      }
+      
+      res.json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error updating account:", error);
+      res.status(500).json({ error: "فشل في تحديث الحساب" });
+    }
+  });
+
+  app.delete("/api/accounts/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAccount(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الحساب غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ error: "فشل في حذف الحساب" });
+    }
+  });
+
+  // Entries Routes
+  app.get("/api/entries", async (_req, res) => {
+    try {
+      const entries = await storage.getEntries();
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching entries:", error);
+      res.status(500).json({ error: "فشل في جلب القيود" });
+    }
+  });
+
+  app.get("/api/entries/:id", async (req, res) => {
+    try {
+      const entry = await storage.getEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: "القيد غير موجود" });
+      }
+      res.json(entry);
+    } catch (error) {
+      console.error("Error fetching entry:", error);
+      res.status(500).json({ error: "فشل في جلب القيد" });
+    }
+  });
+
+  app.post("/api/entries", async (req, res) => {
+    try {
+      const validatedData = insertFullEntrySchema.parse(req.body);
+
+      // Validate that entry is balanced
+      const totalDebit = validatedData.lines.reduce(
+        (sum, line) => sum + Number(line.debit || 0),
+        0
+      );
+      const totalCredit = validatedData.lines.reduce(
+        (sum, line) => sum + Number(line.credit || 0),
+        0
+      );
+
+      if (totalDebit !== totalCredit) {
+        return res.status(400).json({ 
+          error: "القيد غير متوازن - المدين لا يساوي الدائن" 
+        });
+      }
+
+      if (totalDebit === 0) {
+        return res.status(400).json({ 
+          error: "القيد يجب أن يحتوي على مبالغ" 
+        });
+      }
+
+      // Create entry
+      const entry = await storage.createEntry(
+        {
+          entryNumber: validatedData.entryNumber,
+          date: validatedData.date,
+          description: validatedData.description,
+        },
+        validatedData.lines
+      );
+
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error creating entry:", error);
+      res.status(500).json({ error: "فشل في إنشاء القيد" });
+    }
+  });
+
+  app.delete("/api/entries/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteEntry(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "القيد غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting entry:", error);
+      res.status(500).json({ error: "فشل في حذف القيد" });
+    }
+  });
+
+  // Reports Routes
+  app.get("/api/trial-balance", async (_req, res) => {
+    try {
+      const trialBalance = await storage.getTrialBalance();
+      res.json(trialBalance);
+    } catch (error) {
+      console.error("Error fetching trial balance:", error);
+      res.status(500).json({ error: "فشل في جلب ميزان المراجعة" });
+    }
+  });
+
+  app.get("/api/reports/income-statement", async (req, res) => {
+    try {
+      const from = req.query.from 
+        ? new Date(req.query.from as string) 
+        : new Date(new Date().getFullYear(), 0, 1);
+      const to = req.query.to 
+        ? new Date(req.query.to as string) 
+        : new Date();
+
+      const incomeStatement = await storage.getIncomeStatement(from, to);
+      res.json(incomeStatement);
+    } catch (error) {
+      console.error("Error fetching income statement:", error);
+      res.status(500).json({ error: "فشل في جلب قائمة الدخل" });
+    }
+  });
+
+  app.get("/api/reports/balance-sheet", async (req, res) => {
+    try {
+      const date = req.query.date 
+        ? new Date(req.query.date as string) 
+        : new Date();
+
+      const balanceSheet = await storage.getBalanceSheet(date);
+      res.json(balanceSheet);
+    } catch (error) {
+      console.error("Error fetching balance sheet:", error);
+      res.status(500).json({ error: "فشل في جلب الميزانية العمومية" });
+    }
+  });
+
+  // Dashboard Routes
+  app.get("/api/dashboard/stats", async (_req, res) => {
+    try {
+      const stats = await storage.getDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ error: "فشل في جلب الإحصائيات" });
+    }
+  });
 
   const httpServer = createServer(app);
 
