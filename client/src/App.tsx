@@ -12,6 +12,34 @@ import TrialBalance from "@/pages/TrialBalance";
 import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
+
+// Master Data Pages
+import FiscalPeriods from "@/pages/master/FiscalPeriods";
+import Branches from "@/pages/master/Branches";
+import Currencies from "@/pages/master/Currencies";
+import ChartOfAccounts from "@/pages/master/ChartOfAccounts";
+import CostCenters from "@/pages/master/CostCenters";
+import Customers from "@/pages/master/Customers";
+import Suppliers from "@/pages/master/Suppliers";
+
+// Transaction Pages
+import JournalEntries from "@/pages/transactions/JournalEntries";
+import Receipts from "@/pages/transactions/Receipts";
+import Payments from "@/pages/transactions/Payments";
+
+// Report Pages
+import GeneralLedgerTrialBalance from "@/pages/reports/GeneralLedgerTrialBalance";
+import LedgerAccount from "@/pages/reports/LedgerAccount";
+import CustomerBalances from "@/pages/reports/CustomerBalances";
+import CustomerStatement from "@/pages/reports/CustomerStatement";
+import CostCentersReports from "@/pages/reports/CostCentersReports";
+import IncomeStatement from "@/pages/reports/IncomeStatement";
+import BalanceSheet from "@/pages/reports/BalanceSheet";
+
+// Closing Pages
+import CloseEntries from "@/pages/closing/CloseEntries";
+import TransferBalances from "@/pages/closing/TransferBalances";
+
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -20,11 +48,43 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      
+      {/* Legacy routes for backward compatibility */}
       <Route path="/accounts" component={Accounts} />
       <Route path="/entries" component={Entries} />
       <Route path="/trial-balance" component={TrialBalance} />
       <Route path="/reports" component={Reports} />
+      
+      {/* Master Data Routes */}
+      <Route path="/master/system-codes/fiscal-periods" component={FiscalPeriods} />
+      <Route path="/master/system-codes/branches" component={Branches} />
+      <Route path="/master/system-codes/currencies" component={Currencies} />
+      <Route path="/master/chart-of-accounts" component={ChartOfAccounts} />
+      <Route path="/master/cost-centers" component={CostCenters} />
+      <Route path="/master/customers" component={Customers} />
+      <Route path="/master/suppliers" component={Suppliers} />
+      
+      {/* Transaction Routes */}
+      <Route path="/transactions/journal-entries" component={JournalEntries} />
+      <Route path="/transactions/receipts" component={Receipts} />
+      <Route path="/transactions/payments" component={Payments} />
+      
+      {/* Report Routes */}
+      <Route path="/reports/general-ledger/trial-balance" component={GeneralLedgerTrialBalance} />
+      <Route path="/reports/general-ledger/ledger-account" component={LedgerAccount} />
+      <Route path="/reports/subsidiary-ledger/customer-balances" component={CustomerBalances} />
+      <Route path="/reports/subsidiary-ledger/customer-statement" component={CustomerStatement} />
+      <Route path="/reports/cost-centers" component={CostCentersReports} />
+      <Route path="/reports/financial-statements/income-statement" component={IncomeStatement} />
+      <Route path="/reports/financial-statements/balance-sheet" component={BalanceSheet} />
+      
+      {/* Closing Routes */}
+      <Route path="/closing/close-entries" component={CloseEntries} />
+      <Route path="/closing/transfer-balances" component={TransferBalances} />
+      
+      {/* Settings */}
       <Route path="/settings" component={Settings} />
+      
       <Route component={NotFound} />
     </Switch>
   );
@@ -78,7 +138,7 @@ export default function App() {
                 <ThemeToggle />
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
               </header>
-              <main className="flex-1 overflow-auto">
+              <main className="flex-1 overflow-auto p-6">
                 <Router />
               </main>
             </div>
