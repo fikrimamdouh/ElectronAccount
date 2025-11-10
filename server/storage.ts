@@ -29,6 +29,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
+import { ValidationError, NotFoundError, ConflictError, InvalidStateError } from "./errors";
 
 // Sales Invoice filters
 export interface SalesInvoiceFilters {
@@ -1193,6 +1194,420 @@ export class DatabaseStorage implements IStorage {
         ...postedInvoice,
         items: itemsWithDetails,
         customerName: customer.name,
+      };
+    });
+  }
+
+  // ===============================
+  // Receipt Voucher Operations
+  // ===============================
+
+  async getReceiptVouchers(): Promise<FullReceiptVoucher[]> {
+    const vouchers = await db.select().from(receiptVouchers).orderBy(desc(receiptVouchers.createdAt));
+    
+    return await Promise.all(
+      vouchers.map(async (voucher) => {
+        const allocations = await db
+          .select()
+          .from(receiptVoucherAllocations)
+          .where(eq(receiptVoucherAllocations.voucherId, voucher.id));
+
+        const customer = await this.getCustomer(voucher.customerId);
+        const targetAccount = await db
+          .select()
+          .from(accounts)
+          .where(eq(accounts.id, voucher.targetAccountId))
+          .then(res => res[0]);
+
+        const allocationsWithInvoices = await Promise.all(
+          allocations.map(async (allocation) => {
+            const invoice = await db
+              .select()
+              .from(salesInvoices)
+              .where(eq(salesInvoices.id, allocation.invoiceId))
+              .then(res => res[0]);
+            return {
+              ...allocation,
+              invoiceNumber: invoice?.invoiceNumber,
+            };
+          })
+        );
+
+        return {
+          ...voucher,
+          allocations: allocationsWithInvoices,
+          customerName: customer?.name,
+          targetAccountName: targetAccount?.name,
+        };
+      })
+    );
+  }
+
+  async getReceiptVoucher(id: string): Promise<FullReceiptVoucher | null> {
+    const [voucher] = await db.select().from(receiptVouchers).where(eq(receiptVouchers.id, id));
+    if (!voucher) return null;
+
+    const allocations = await db
+      .select()
+      .from(receiptVoucherAllocations)
+      .where(eq(receiptVoucherAllocations.voucherId, id));
+
+    const customer = await this.getCustomer(voucher.customerId);
+    const targetAccount = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, voucher.targetAccountId))
+      .then(res => res[0]);
+
+    const allocationsWithInvoices = await Promise.all(
+      allocations.map(async (allocation) => {
+        const invoice = await db
+          .select()
+          .from(salesInvoices)
+          .where(eq(salesInvoices.id, allocation.invoiceId))
+          .then(res => res[0]);
+        return {
+          ...allocation,
+          invoiceNumber: invoice?.invoiceNumber,
+        };
+      })
+    );
+
+    return {
+      ...voucher,
+      allocations: allocationsWithInvoices,
+      customerName: customer?.name,
+      targetAccountName: targetAccount?.name,
+    };
+  }
+
+  async createReceiptVoucherDraft(data: InsertFullReceiptVoucher): Promise<FullReceiptVoucher> {
+    return await db.transaction(async (tx) => {
+      // Validate allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        // Check sum of allocations doesn't exceed voucher amount
+        const totalAllocations = data.allocations.reduce(
+          (sum, allocation) => sum + parseFloat(allocation.amount.toString()),
+          0
+        );
+        const voucherAmount = parseFloat(data.amount.toString());
+        
+        if (totalAllocations > voucherAmount) {
+          throw new ValidationError(`مجموع التخصيصات (${totalAllocations}) يتجاوز مبلغ السند (${voucherAmount})`);
+        }
+
+        // Validate each allocation
+        for (const allocation of data.allocations) {
+          // Check amount is positive
+          if (parseFloat(allocation.amount.toString()) <= 0) {
+            throw new ValidationError("مبلغ التخصيص يجب أن يكون أكبر من صفر");
+          }
+
+          const [invoice] = await tx
+            .select()
+            .from(salesInvoices)
+            .where(eq(salesInvoices.id, allocation.invoiceId));
+
+          if (!invoice) {
+            throw new NotFoundError(`الفاتورة غير موجودة: ${allocation.invoiceId}`);
+          }
+
+          if (invoice.customerId !== data.customerId) {
+            throw new ValidationError(`الفاتورة ${invoice.invoiceNumber} لا تنتمي للعميل المحدد`);
+          }
+
+          if (invoice.status !== "منشورة") {
+            throw new ValidationError(`الفاتورة ${invoice.invoiceNumber} ليست منشورة`);
+          }
+        }
+      }
+
+      // Create voucher
+      const [voucher] = await tx
+        .insert(receiptVouchers)
+        .values({
+          voucherNumber: data.voucherNumber,
+          voucherDate: new Date(data.voucherDate),
+          customerId: data.customerId,
+          amount: data.amount.toString(),
+          paymentMethod: data.paymentMethod,
+          targetAccountId: data.targetAccountId,
+          checkNumber: data.checkNumber,
+          checkDate: data.checkDate ? new Date(data.checkDate) : undefined,
+          checkBank: data.checkBank,
+          status: "مسودة",
+          notes: data.notes,
+        })
+        .returning();
+
+      // Create allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        await tx.insert(receiptVoucherAllocations).values(
+          data.allocations.map((allocation) => ({
+            voucherId: voucher.id,
+            invoiceId: allocation.invoiceId,
+            amount: allocation.amount.toString(),
+          }))
+        );
+      }
+
+      return await this.getReceiptVoucher(voucher.id) as FullReceiptVoucher;
+    });
+  }
+
+  async updateReceiptVoucherDraft(id: string, data: InsertFullReceiptVoucher): Promise<FullReceiptVoucher> {
+    return await db.transaction(async (tx) => {
+      // Get voucher
+      const [voucher] = await tx.select().from(receiptVouchers).where(eq(receiptVouchers.id, id));
+      
+      if (!voucher) {
+        throw new NotFoundError("السند غير موجود");
+      }
+
+      if (voucher.status !== "مسودة") {
+        throw new InvalidStateError("لا يمكن تعديل سند منشور");
+      }
+
+      // Validate allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        // Check sum of allocations doesn't exceed voucher amount
+        const totalAllocations = data.allocations.reduce(
+          (sum, allocation) => sum + parseFloat(allocation.amount.toString()),
+          0
+        );
+        const voucherAmount = parseFloat(data.amount.toString());
+        
+        if (totalAllocations > voucherAmount) {
+          throw new ValidationError(`مجموع التخصيصات (${totalAllocations}) يتجاوز مبلغ السند (${voucherAmount})`);
+        }
+
+        // Validate each allocation
+        for (const allocation of data.allocations) {
+          // Check amount is positive
+          if (parseFloat(allocation.amount.toString()) <= 0) {
+            throw new ValidationError("مبلغ التخصيص يجب أن يكون أكبر من صفر");
+          }
+
+          const [invoice] = await tx
+            .select()
+            .from(salesInvoices)
+            .where(eq(salesInvoices.id, allocation.invoiceId));
+
+          if (!invoice) {
+            throw new NotFoundError(`الفاتورة غير موجودة: ${allocation.invoiceId}`);
+          }
+
+          if (invoice.customerId !== data.customerId) {
+            throw new ValidationError(`الفاتورة ${invoice.invoiceNumber} لا تنتمي للعميل المحدد`);
+          }
+
+          if (invoice.status !== "منشورة") {
+            throw new ValidationError(`الفاتورة ${invoice.invoiceNumber} ليست منشورة`);
+          }
+        }
+      }
+
+      // Update voucher
+      await tx
+        .update(receiptVouchers)
+        .set({
+          voucherNumber: data.voucherNumber,
+          voucherDate: new Date(data.voucherDate),
+          customerId: data.customerId,
+          amount: data.amount.toString(),
+          paymentMethod: data.paymentMethod,
+          targetAccountId: data.targetAccountId,
+          checkNumber: data.checkNumber,
+          checkDate: data.checkDate ? new Date(data.checkDate) : undefined,
+          checkBank: data.checkBank,
+          notes: data.notes,
+        })
+        .where(eq(receiptVouchers.id, id));
+
+      // Delete old allocations
+      await tx.delete(receiptVoucherAllocations).where(eq(receiptVoucherAllocations.voucherId, id));
+
+      // Create new allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        await tx.insert(receiptVoucherAllocations).values(
+          data.allocations.map((allocation) => ({
+            voucherId: id,
+            invoiceId: allocation.invoiceId,
+            amount: allocation.amount.toString(),
+          }))
+        );
+      }
+
+      return await this.getReceiptVoucher(id) as FullReceiptVoucher;
+    });
+  }
+
+  async deleteReceiptVoucherDraft(id: string): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [voucher] = await tx.select().from(receiptVouchers).where(eq(receiptVouchers.id, id));
+      
+      if (!voucher) {
+        return false;
+      }
+
+      if (voucher.status !== "مسودة") {
+        throw new InvalidStateError("لا يمكن حذف سند منشور");
+      }
+
+      // Delete allocations
+      await tx.delete(receiptVoucherAllocations).where(eq(receiptVoucherAllocations.voucherId, id));
+
+      // Delete voucher
+      await tx.delete(receiptVouchers).where(eq(receiptVouchers.id, id));
+
+      return true;
+    });
+  }
+
+  async postReceiptVoucher(id: string): Promise<FullReceiptVoucher> {
+    return await db.transaction(async (tx) => {
+      // Get voucher
+      const [voucher] = await tx.select().from(receiptVouchers).where(eq(receiptVouchers.id, id));
+
+      if (!voucher) {
+        throw new NotFoundError("السند غير موجود");
+      }
+
+      if (voucher.status === "منشور") {
+        throw new InvalidStateError("السند منشور مسبقاً");
+      }
+
+      // Get customer
+      const [customer] = await tx.select().from(customers).where(eq(customers.id, voucher.customerId));
+
+      if (!customer || !customer.accountId) {
+        throw new NotFoundError("العميل غير موجود أو ليس له حساب محاسبي مرتبط");
+      }
+
+      // Get target account (bank or cash)
+      const [targetAccount] = await tx.select().from(accounts).where(eq(accounts.id, voucher.targetAccountId));
+
+      if (!targetAccount) {
+        throw new NotFoundError("الحساب المستهدف غير موجود");
+      }
+
+      // Re-validate allocations before posting
+      const allocations = await tx
+        .select()
+        .from(receiptVoucherAllocations)
+        .where(eq(receiptVoucherAllocations.voucherId, id));
+
+      if (allocations.length > 0) {
+        // Check sum of allocations
+        const totalAllocations = allocations.reduce(
+          (sum, allocation) => sum + parseFloat(allocation.amount),
+          0
+        );
+        const voucherAmount = parseFloat(voucher.amount);
+        
+        if (totalAllocations > voucherAmount) {
+          throw new ValidationError(`مجموع التخصيصات (${totalAllocations}) يتجاوز مبلغ السند (${voucherAmount})`);
+        }
+
+        // Validate each allocation
+        for (const allocation of allocations) {
+          const [invoice] = await tx
+            .select()
+            .from(salesInvoices)
+            .where(eq(salesInvoices.id, allocation.invoiceId));
+
+          if (!invoice) {
+            throw new NotFoundError(`الفاتورة غير موجودة: ${allocation.invoiceId}`);
+          }
+
+          if (invoice.customerId !== voucher.customerId) {
+            throw new ValidationError(`الفاتورة ${invoice.invoiceNumber} لا تنتمي للعميل المحدد`);
+          }
+
+          if (invoice.status !== "منشورة") {
+            throw new ValidationError(`الفاتورة ${invoice.invoiceNumber} ليست منشورة`);
+          }
+        }
+      }
+
+      // Create accounting entry
+      // Debit: Bank/Cash account, Credit: Customer account
+      const [entry] = await tx
+        .insert(entries)
+        .values({
+          entryNumber: `RCV-${voucher.voucherNumber}`,
+          date: voucher.voucherDate,
+          description: `سند قبض رقم ${voucher.voucherNumber} من ${customer.name}`,
+          totalDebit: voucher.amount,
+          totalCredit: voucher.amount,
+          isBalanced: 1,
+        })
+        .returning();
+
+      // Entry line 1: Debit target account (bank/cash)
+      await tx.insert(entryLines).values({
+        entryId: entry.id,
+        accountId: voucher.targetAccountId,
+        debit: voucher.amount,
+        credit: "0",
+        description: `${targetAccount.name} - ${voucher.paymentMethod}`,
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric + ${voucher.amount}::numeric` })
+        .where(eq(accounts.id, voucher.targetAccountId));
+
+      // Entry line 2: Credit customer account
+      await tx.insert(entryLines).values({
+        entryId: entry.id,
+        accountId: customer.accountId,
+        debit: "0",
+        credit: voucher.amount,
+        description: `من العميل: ${customer.name}`,
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric - ${voucher.amount}::numeric` })
+        .where(eq(accounts.id, customer.accountId));
+
+      // Update customer balance (decrease debit balance)
+      const newCustomerBalance = parseFloat(customer.currentBalance) - parseFloat(voucher.amount);
+      await tx
+        .update(customers)
+        .set({ currentBalance: newCustomerBalance.toString() })
+        .where(eq(customers.id, voucher.customerId));
+
+      // Update voucher status
+      const [postedVoucher] = await tx
+        .update(receiptVouchers)
+        .set({
+          status: "منشور",
+          entryId: entry.id,
+          postedAt: new Date(),
+        })
+        .where(eq(receiptVouchers.id, id))
+        .returning();
+
+      // Use allocations already fetched earlier for validation
+      const allocationsWithInvoices = await Promise.all(
+        allocations.map(async (allocation) => {
+          const invoice = await tx
+            .select()
+            .from(salesInvoices)
+            .where(eq(salesInvoices.id, allocation.invoiceId))
+            .then(res => res[0]);
+          return {
+            ...allocation,
+            invoiceNumber: invoice?.invoiceNumber,
+          };
+        })
+      );
+
+      return {
+        ...postedVoucher,
+        allocations: allocationsWithInvoices,
+        customerName: customer.name,
+        targetAccountName: targetAccount.name,
       };
     });
   }

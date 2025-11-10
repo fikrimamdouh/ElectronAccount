@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import {
@@ -7,6 +7,7 @@ import {
   insertProductSchema,
   insertCustomerSchema,
   insertFullSalesInvoiceSchema,
+  insertFullReceiptVoucherSchema,
   type InsertAccount,
   type InsertFullEntry,
   type InsertProduct,
@@ -14,6 +15,7 @@ import {
   type InsertFullSalesInvoice,
 } from "@shared/schema";
 import { z } from "zod";
+import { AppError } from "./errors";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Accounts Routes
@@ -514,6 +516,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error instanceof Error ? error.message : "فشل في نشر الفاتورة" 
       });
     }
+  });
+
+  // Receipt Voucher routes
+  app.get("/api/receipt-vouchers", async (_req, res) => {
+    try {
+      const vouchers = await storage.getReceiptVouchers();
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching receipt vouchers:", error);
+      res.status(500).json({ error: "فشل في جلب سندات القبض" });
+    }
+  });
+
+  app.get("/api/receipt-vouchers/:id", async (req, res) => {
+    try {
+      const voucher = await storage.getReceiptVoucher(req.params.id);
+      if (!voucher) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json(voucher);
+    } catch (error) {
+      console.error("Error fetching receipt voucher:", error);
+      res.status(500).json({ error: "فشل في جلب السند" });
+    }
+  });
+
+  app.post("/api/receipt-vouchers", async (req, res) => {
+    try {
+      const validatedData = insertFullReceiptVoucherSchema.parse(req.body);
+
+      // Check if voucher number already exists
+      const allVouchers = await storage.getReceiptVouchers();
+      const existing = allVouchers.find(v => v.voucherNumber === validatedData.voucherNumber);
+      if (existing) {
+        return res.status(400).json({ error: "رقم السند موجود بالفعل" });
+      }
+
+      const voucher = await storage.createReceiptVoucherDraft(validatedData);
+      res.status(201).json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error creating receipt voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في إنشاء السند" 
+      });
+    }
+  });
+
+  app.put("/api/receipt-vouchers/:id", async (req, res) => {
+    try {
+      const validatedData = insertFullReceiptVoucherSchema.parse(req.body);
+      const voucher = await storage.updateReceiptVoucherDraft(req.params.id, validatedData);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error updating receipt voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في تحديث السند" 
+      });
+    }
+  });
+
+  app.delete("/api/receipt-vouchers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteReceiptVoucherDraft(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error deleting receipt voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في حذف السند" 
+      });
+    }
+  });
+
+  app.post("/api/receipt-vouchers/:id/post", async (req, res) => {
+    try {
+      const voucher = await storage.postReceiptVoucher(req.params.id);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error posting receipt voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في نشر السند" 
+      });
+    }
+  });
+
+  // Centralized error handling middleware
+  // MUST be added after all routes
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    // Handle AppError instances (ValidationError, NotFoundError, etc.)
+    if (err instanceof AppError) {
+      return res.status(err.status).json({ 
+        error: err.message,
+        code: err.code 
+      });
+    }
+
+    // Handle Zod validation errors
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: "بيانات غير صحيحة",
+        details: err.errors 
+      });
+    }
+
+    // Unknown errors - log and return 500
+    console.error("Unhandled error:", err);
+    res.status(500).json({ 
+      error: err instanceof Error ? err.message : "حدث خطأ في الخادم" 
+    });
   });
 
   const httpServer = createServer(app);

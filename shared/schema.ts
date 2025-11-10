@@ -352,3 +352,135 @@ export type FullSalesInvoice = SalesInvoice & {
   items: (SalesInvoiceItem & { productName?: string; unit?: string })[];
   customerName?: string;
 };
+
+// ===============================
+// سند القبض (Receipt Voucher)
+// ===============================
+
+// أنواع طرق الدفع
+export type PaymentMethod = "نقدي" | "بنك" | "شيك";
+
+// جدول سندات القبض
+export const receiptVouchers = pgTable("receipt_vouchers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  voucherNumber: varchar("voucher_number", { length: 50 }).notNull().unique(),
+  voucherDate: timestamp("voucher_date").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull().$type<PaymentMethod>(),
+  targetAccountId: varchar("target_account_id").notNull(), // حساب البنك أو الصندوق
+  checkNumber: varchar("check_number", { length: 50 }),
+  checkDate: timestamp("check_date"),
+  checkBank: varchar("check_bank", { length: 100 }),
+  status: text("status").notNull().default("مسودة"), // "مسودة" أو "منشور"
+  notes: text("notes"),
+  entryId: varchar("entry_id"), // القيد المحاسبي المرتبط (بعد النشر)
+  postedAt: timestamp("posted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// جدول تخصيصات سند القبض (ربط السند بفواتير معينة)
+export const receiptVoucherAllocations = pgTable("receipt_voucher_allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  voucherId: varchar("voucher_id").notNull(),
+  invoiceId: varchar("invoice_id").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Schema للإدراج - سندات القبض
+export const insertReceiptVoucherSchema = createInsertSchema(receiptVouchers).omit({
+  id: true,
+  createdAt: true,
+  entryId: true,
+  postedAt: true,
+}).extend({
+  voucherNumber: z.string().min(1, "رقم السند مطلوب"),
+  voucherDate: z.string().or(z.date()),
+  customerId: z.string().min(1, "العميل مطلوب"),
+  amount: z.string().or(z.number()).refine(
+    val => parseFloat(val.toString()) > 0, 
+    "المبلغ يجب أن يكون أكبر من صفر"
+  ),
+  paymentMethod: z.enum(["نقدي", "بنك", "شيك"], {
+    errorMap: () => ({ message: "طريقة الدفع غير صحيحة" }),
+  }),
+  targetAccountId: z.string().min(1, "حساب القبض مطلوب"),
+  checkNumber: z.string().optional(),
+  checkDate: z.string().or(z.date()).optional(),
+  checkBank: z.string().optional(),
+  status: z.enum(["مسودة", "منشور"]).default("مسودة"),
+  notes: z.string().optional(),
+});
+
+// Schema للإدراج - تخصيصات سند القبض
+export const insertReceiptVoucherAllocationSchema = createInsertSchema(receiptVoucherAllocations).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherId: z.string().min(1),
+  invoiceId: z.string().min(1, "الفاتورة مطلوبة"),
+  amount: z.string().or(z.number()).refine(
+    val => parseFloat(val.toString()) > 0, 
+    "المبلغ يجب أن يكون أكبر من صفر"
+  ),
+});
+
+// Schema لسند القبض الكامل مع التخصيصات
+export const insertFullReceiptVoucherSchema = z.object({
+  voucherNumber: z.string().min(1, "رقم السند مطلوب"),
+  voucherDate: z.string().or(z.date()),
+  customerId: z.string().min(1, "العميل مطلوب"),
+  amount: z.string().or(z.number()).refine(
+    val => parseFloat(val.toString()) > 0, 
+    "المبلغ يجب أن يكون أكبر من صفر"
+  ),
+  paymentMethod: z.enum(["نقدي", "بنك", "شيك"], {
+    errorMap: () => ({ message: "طريقة الدفع غير صحيحة" }),
+  }),
+  targetAccountId: z.string().min(1, "حساب القبض مطلوب"),
+  checkNumber: z.string().optional(),
+  checkDate: z.string().or(z.date()).optional(),
+  checkBank: z.string().optional(),
+  notes: z.string().optional(),
+  allocations: z.array(
+    z.object({
+      invoiceId: z.string().min(1, "الفاتورة مطلوبة"),
+      amount: z.string().or(z.number()).refine(
+        val => parseFloat(val.toString()) > 0, 
+        "المبلغ يجب أن يكون أكبر من صفر"
+      ),
+    })
+  ).optional().default([]),
+}).refine(
+  (data) => {
+    // If allocations exist, their sum must equal the voucher amount
+    if (data.allocations && data.allocations.length > 0) {
+      const totalAllocations = data.allocations.reduce(
+        (sum, allocation) => sum + parseFloat(allocation.amount.toString()),
+        0
+      );
+      const voucherAmount = parseFloat(data.amount.toString());
+      return Math.abs(totalAllocations - voucherAmount) < 0.01; // Allow 0.01 tolerance for floating point
+    }
+    return true;
+  },
+  {
+    message: "مجموع التخصيصات يجب أن يساوي مبلغ السند بالضبط",
+    path: ["allocations"],
+  }
+);
+
+// أنواع TypeScript - سندات القبض
+export type InsertReceiptVoucher = z.infer<typeof insertReceiptVoucherSchema>;
+export type ReceiptVoucher = typeof receiptVouchers.$inferSelect;
+export type InsertReceiptVoucherAllocation = z.infer<typeof insertReceiptVoucherAllocationSchema>;
+export type ReceiptVoucherAllocation = typeof receiptVoucherAllocations.$inferSelect;
+export type InsertFullReceiptVoucher = z.infer<typeof insertFullReceiptVoucherSchema>;
+
+// نوع لسند القبض الكامل مع التفاصيل
+export type FullReceiptVoucher = ReceiptVoucher & {
+  allocations: (ReceiptVoucherAllocation & { invoiceNumber?: string })[];
+  customerName?: string;
+  targetAccountName?: string;
+};
