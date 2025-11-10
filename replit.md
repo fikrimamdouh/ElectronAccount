@@ -24,6 +24,22 @@ The system is built as a monolithic ERP application with a modular design, featu
   - Real-time balance tracking with color-coded display (green for debit, red for credit)
   - Comprehensive error handling with loading/error states and retry functionality
 
+- ✅ **Supplier Management (إدارة بيانات الموردين)** - FULLY COMPLETED:
+  - **Database Schema**: `suppliers` table with full integration to chart of accounts
+  - **Automatic Account Creation**: Creates liability account in chart of accounts (code: 2120-{supplier_code}, type: "خصوم")
+  - **Opening Balance Support**: Credit balance tracking (المبالغ المستحقة للمورد)
+  - **Transaction-Safe Operations**: PostgreSQL transactions ensure atomicity for supplier + account creation/deletion
+  - **Deletion Protection**: Cannot delete suppliers with non-zero account balances (validation with Arabic error message)
+  - **Real-Time Balance Tracking**: Color-coded display (green for credit, red for debit)
+  - **Full CRUD Operations**: Create, read, update, delete with Zod validation
+  - **UI/UX Features**:
+    - React Hook Form with zodResolver integration
+    - Data table with loading/error/empty states
+    - Toast notifications for all operations
+    - Proper RTL labels and placeholders ("مورد" not "عميل", placeholder "S001")
+    - Comprehensive data-testid attributes for E2E testing
+  - **E2E Tested**: Full workflow verified (create → update → delete with zero balance → deletion protection for non-zero balance)
+
 - ✅ **Sales Invoices (فواتير المبيعات)** - COMPLETED FIRST CORE MODULE:
   - **Database Schema**: `salesInvoices`, `salesInvoiceItems`, `stockMovements` tables
   - **Draft/Posted Workflow**: Invoices start as drafts, can be edited/deleted, then posted permanently

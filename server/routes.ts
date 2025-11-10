@@ -6,6 +6,7 @@ import {
   insertFullEntrySchema,
   insertProductSchema,
   insertCustomerSchema,
+  insertSupplierSchema,
   insertFullSalesInvoiceSchema,
   insertFullReceiptVoucherSchema,
   type InsertAccount,
@@ -403,6 +404,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting customer:", error);
       res.status(500).json({ error: "فشل في حذف العميل" });
+    }
+  });
+
+  // Suppliers Routes
+  app.get("/api/suppliers", async (_req, res) => {
+    try {
+      const suppliers = await storage.getSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      res.status(500).json({ error: "فشل في جلب الموردين" });
+    }
+  });
+
+  app.get("/api/suppliers/:id", async (req, res) => {
+    try {
+      const supplier = await storage.getSupplier(req.params.id);
+      if (!supplier) {
+        return res.status(404).json({ error: "المورد غير موجود" });
+      }
+      res.json(supplier);
+    } catch (error) {
+      console.error("Error fetching supplier:", error);
+      res.status(500).json({ error: "فشل في جلب المورد" });
+    }
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      const validatedData = insertSupplierSchema.parse(req.body);
+
+      // Check if supplier code already exists
+      const existing = await storage.getSupplierByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "كود المورد موجود بالفعل" });
+      }
+
+      const supplier = await storage.createSupplier(validatedData);
+      res.status(201).json(supplier);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error creating supplier:", error);
+      res.status(500).json({ error: "فشل في إنشاء المورد" });
+    }
+  });
+
+  app.put("/api/suppliers/:id", async (req, res) => {
+    try {
+      const validatedData = insertSupplierSchema.partial().parse(req.body);
+      const supplier = await storage.updateSupplier(req.params.id, validatedData);
+      
+      if (!supplier) {
+        return res.status(404).json({ error: "المورد غير موجود" });
+      }
+      
+      res.json(supplier);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error updating supplier:", error);
+      res.status(500).json({ error: "فشل في تحديث المورد" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSupplier(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "المورد غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      res.status(500).json({ error: "فشل في حذف المورد" });
     }
   });
 

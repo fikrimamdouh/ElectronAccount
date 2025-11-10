@@ -14,6 +14,8 @@ import {
   type InsertProduct,
   type Customer,
   type InsertCustomer,
+  type Supplier,
+  type InsertSupplier,
   type SalesInvoice,
   type InsertFullSalesInvoice,
   type FullSalesInvoice,
@@ -25,6 +27,7 @@ import {
   entryLines,
   products,
   customers,
+  suppliers,
   salesInvoices,
   salesInvoiceItems,
   stockMovements,
@@ -84,6 +87,15 @@ export interface IStorage {
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
   deleteCustomer(id: string): Promise<boolean>;
   updateCustomerBalance(id: string, amount: number): Promise<void>;
+
+  // Suppliers
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  getSupplierByCode(code: string): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+  deleteSupplier(id: string): Promise<boolean>;
+  updateSupplierBalance(id: string, amount: number): Promise<void>;
 
   // Sales Invoices
   createSalesInvoiceDraft(invoice: InsertFullSalesInvoice): Promise<FullSalesInvoice>;
@@ -578,6 +590,117 @@ export class DatabaseStorage implements IStorage {
       // Update linked account balance
       if (customer.accountId) {
         await this.updateAccountBalance(customer.accountId, amount);
+      }
+    }
+  }
+
+  // Suppliers
+  async getSuppliers(): Promise<Supplier[]> {
+    return await db.select().from(suppliers);
+  }
+
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier || undefined;
+  }
+
+  async getSupplierByCode(code: string): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.code, code));
+    return supplier || undefined;
+  }
+
+  async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
+    // Use transaction to ensure both supplier and account are created atomically
+    return await db.transaction(async (tx) => {
+      // Create supplier account in chart of accounts if not provided
+      let accountId = insertSupplier.accountId;
+      
+      if (!accountId) {
+        const [supplierAccount] = await tx
+          .insert(accounts)
+          .values({
+            code: `2120-${insertSupplier.code}`,
+            name: `مورد: ${insertSupplier.name}`,
+            type: "خصوم",
+            parentId: null,
+            balance: insertSupplier.openingBalance.toString(),
+            isActive: 1,
+          })
+          .returning();
+        accountId = supplierAccount.id;
+      }
+
+      const [supplier] = await tx
+        .insert(suppliers)
+        .values({
+          ...insertSupplier,
+          openingBalance: insertSupplier.openingBalance.toString(),
+          currentBalance: insertSupplier.openingBalance.toString(),
+          accountId,
+        })
+        .returning();
+
+      return supplier;
+    });
+  }
+
+  async updateSupplier(id: string, data: Partial<InsertSupplier>): Promise<Supplier | undefined> {
+    const updateData: any = { ...data };
+    if (data.openingBalance !== undefined) {
+      updateData.openingBalance = data.openingBalance.toString();
+    }
+    
+    const [supplier] = await db
+      .update(suppliers)
+      .set(updateData)
+      .where(eq(suppliers.id, id))
+      .returning();
+    return supplier || undefined;
+  }
+
+  async deleteSupplier(id: string): Promise<boolean> {
+    // Use transaction to delete supplier and their account
+    return await db.transaction(async (tx) => {
+      // Get supplier first to check if they have linked account
+      const [supplier] = await tx.select().from(suppliers).where(eq(suppliers.id, id));
+      
+      if (!supplier) {
+        return false;
+      }
+
+      // Check if linked account exists and validate balance before deletion
+      if (supplier.accountId) {
+        const [account] = await tx.select().from(accounts).where(eq(accounts.id, supplier.accountId));
+        if (account) {
+          const balance = parseFloat(account.balance);
+          if (balance !== 0) {
+            // Abort transaction if account has non-zero balance
+            throw new Error(`لا يمكن حذف المورد. الرصيد الحالي للحساب المحاسبي: ${balance.toFixed(2)} ر.س. يجب أن يكون الرصيد صفر أولاً.`);
+          }
+          // Delete account if balance is zero
+          await tx.delete(accounts).where(eq(accounts.id, supplier.accountId));
+        }
+      }
+
+      // Delete supplier after validating account balance
+      await tx.delete(suppliers).where(eq(suppliers.id, id));
+
+      return true;
+    });
+  }
+
+  async updateSupplierBalance(id: string, amount: number): Promise<void> {
+    const supplier = await this.getSupplier(id);
+    if (supplier) {
+      const newBalance = parseFloat(supplier.currentBalance) + amount;
+      await db
+        .update(suppliers)
+        .set({ currentBalance: newBalance.toString() })
+        .where(eq(suppliers.id, id));
+      
+      // Update linked account balance
+      if (supplier.accountId) {
+        await this.updateAccountBalance(supplier.accountId, amount);
       }
     }
   }

@@ -222,6 +222,43 @@ export const insertCustomerSchema = createInsertSchema(customers).omit({
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type Customer = typeof customers.$inferSelect;
 
+// جدول الموردين
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  name: text("name").notNull(),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 100 }),
+  address: text("address"),
+  taxNumber: varchar("tax_number", { length: 50 }),
+  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).notNull().default("0"),
+  currentBalance: decimal("current_balance", { precision: 15, scale: 2 }).notNull().default("0"),
+  accountId: varchar("account_id"), // الحساب المحاسبي المرتبط
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Schema للإدراج - الموردين
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+  currentBalance: true,
+}).extend({
+  code: z.string().min(1, "كود المورد مطلوب"),
+  name: z.string().min(1, "اسم المورد مطلوب"),
+  phone: z.string().optional(),
+  email: z.string().email("البريد الإلكتروني غير صحيح").optional().or(z.literal("")),
+  address: z.string().optional(),
+  taxNumber: z.string().optional(),
+  openingBalance: z.string().or(z.number()).default("0"),
+  accountId: z.string().optional(),
+  isActive: z.number().default(1),
+});
+
+// أنواع TypeScript - الموردين
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
 // حالة الفاتورة
 export type InvoiceStatus = "مسودة" | "منشورة";
 
