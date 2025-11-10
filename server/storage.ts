@@ -14,14 +14,37 @@ import {
   type InsertProduct,
   type Customer,
   type InsertCustomer,
+  type SalesInvoice,
+  type InsertFullSalesInvoice,
+  type FullSalesInvoice,
+  type InvoiceStatus,
   accounts,
   entries,
   entryLines,
   products,
   customers,
+  salesInvoices,
+  salesInvoiceItems,
+  stockMovements,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
+
+// Sales Invoice filters
+export interface SalesInvoiceFilters {
+  status?: InvoiceStatus;
+  customerId?: string;
+  from?: Date;
+  to?: Date;
+}
+
+// Computed totals result
+export interface SalesInvoiceTotals {
+  subtotal: string;
+  taxAmount: string;
+  total: string;
+  totalCost: string;
+}
 
 export interface IStorage {
   // Accounts
@@ -46,6 +69,7 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<boolean>;
+  updateProductQuantity(id: string, quantity: number): Promise<void>;
 
   // Customers
   getCustomers(): Promise<Customer[]>;
@@ -55,6 +79,15 @@ export interface IStorage {
   updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
   deleteCustomer(id: string): Promise<boolean>;
   updateCustomerBalance(id: string, amount: number): Promise<void>;
+
+  // Sales Invoices
+  createSalesInvoiceDraft(invoice: InsertFullSalesInvoice): Promise<FullSalesInvoice>;
+  getSalesInvoices(filters?: SalesInvoiceFilters): Promise<FullSalesInvoice[]>;
+  getSalesInvoice(id: string): Promise<FullSalesInvoice | undefined>;
+  updateSalesInvoiceDraft(id: string, invoice: InsertFullSalesInvoice): Promise<FullSalesInvoice>;
+  deleteSalesInvoiceDraft(id: string): Promise<boolean>;
+  postSalesInvoice(id: string): Promise<FullSalesInvoice>;
+  computeSalesInvoiceTotals(items: Array<{productId: string; quantity: number; unitPrice: number}>): Promise<SalesInvoiceTotals>;
 
   // Reports
   getTrialBalance(): Promise<TrialBalanceRow[]>;
@@ -421,6 +454,17 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount !== null && result.rowCount > 0;
   }
 
+  async updateProductQuantity(id: string, quantity: number): Promise<void> {
+    const product = await this.getProduct(id);
+    if (product) {
+      const newQuantity = parseFloat(product.quantityOnHand) + quantity;
+      await db
+        .update(products)
+        .set({ quantityOnHand: newQuantity.toString() })
+        .where(eq(products.id, id));
+    }
+  }
+
   // Customers
   async getCustomers(): Promise<Customer[]> {
     return await db.select().from(customers);
@@ -578,6 +622,579 @@ export class DatabaseStorage implements IStorage {
       recentEntries,
       monthlyData,
     };
+  }
+
+  // Sales Invoices
+  async computeSalesInvoiceTotals(items: Array<{productId: string; quantity: number; unitPrice: number}>): Promise<SalesInvoiceTotals> {
+    let subtotal = 0;
+    let totalCost = 0;
+
+    for (const item of items) {
+      const product = await this.getProduct(item.productId);
+      if (!product) {
+        throw new Error(`الصنف غير موجود: ${item.productId}`);
+      }
+
+      const itemTotal = item.quantity * item.unitPrice;
+      const itemCost = item.quantity * parseFloat(product.costPrice);
+      
+      subtotal += itemTotal;
+      totalCost += itemCost;
+    }
+
+    const taxRate = 0.15; // 15% Saudi VAT
+    const taxAmount = subtotal * taxRate;
+    const total = subtotal + taxAmount;
+
+    return {
+      subtotal: subtotal.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      total: total.toFixed(2),
+      totalCost: totalCost.toFixed(2),
+    };
+  }
+
+  async createSalesInvoiceDraft(insertInvoice: InsertFullSalesInvoice): Promise<FullSalesInvoice> {
+    return await db.transaction(async (tx) => {
+      // Compute totals
+      const totals = await this.computeSalesInvoiceTotals(
+        insertInvoice.items.map(item => ({
+          productId: item.productId,
+          quantity: parseFloat(item.quantity.toString()),
+          unitPrice: parseFloat(item.unitPrice.toString()),
+        }))
+      );
+
+      // Create invoice header
+      const [invoice] = await tx
+        .insert(salesInvoices)
+        .values({
+          invoiceNumber: insertInvoice.invoiceNumber,
+          invoiceDate: new Date(insertInvoice.invoiceDate),
+          customerId: insertInvoice.customerId,
+          totalBeforeTax: totals.subtotal,
+          taxRate: insertInvoice.taxRate?.toString() || "0.15",
+          taxAmount: totals.taxAmount,
+          totalAfterTax: totals.total,
+          totalCost: totals.totalCost,
+          status: "مسودة",
+          notes: insertInvoice.notes || null,
+        })
+        .returning();
+
+      // Create invoice items
+      const items = [];
+      for (const item of insertInvoice.items) {
+        const product = await this.getProduct(item.productId);
+        if (!product) {
+          throw new Error(`الصنف غير موجود: ${item.productId}`);
+        }
+
+        const quantity = parseFloat(item.quantity.toString());
+        const unitPrice = parseFloat(item.unitPrice.toString());
+        const costPrice = parseFloat(product.costPrice);
+        const total = quantity * unitPrice;
+        const totalCost = quantity * costPrice;
+
+        const [invoiceItem] = await tx
+          .insert(salesInvoiceItems)
+          .values({
+            invoiceId: invoice.id,
+            productId: item.productId,
+            quantity: quantity.toString(),
+            unitPrice: unitPrice.toString(),
+            total: total.toFixed(2),
+            costPrice: costPrice.toString(),
+            totalCost: totalCost.toFixed(2),
+          })
+          .returning();
+
+        items.push({
+          ...invoiceItem,
+          productName: product.itemName,
+          unit: product.unit,
+        });
+      }
+
+      // Get customer name
+      const customer = await this.getCustomer(invoice.customerId);
+
+      return {
+        ...invoice,
+        items,
+        customerName: customer?.name,
+      };
+    });
+  }
+
+  async getSalesInvoices(filters?: SalesInvoiceFilters): Promise<FullSalesInvoice[]> {
+    const conditions = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(salesInvoices.status, filters.status));
+    }
+    if (filters?.customerId) {
+      conditions.push(eq(salesInvoices.customerId, filters.customerId));
+    }
+    if (filters?.from) {
+      conditions.push(gte(salesInvoices.invoiceDate, filters.from));
+    }
+    if (filters?.to) {
+      conditions.push(lte(salesInvoices.invoiceDate, filters.to));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const allInvoices = await db
+      .select()
+      .from(salesInvoices)
+      .where(whereClause)
+      .orderBy(desc(salesInvoices.createdAt));
+
+    const fullInvoices: FullSalesInvoice[] = [];
+
+    for (const invoice of allInvoices) {
+      const items = await db
+        .select()
+        .from(salesInvoiceItems)
+        .where(eq(salesInvoiceItems.invoiceId, invoice.id));
+
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          const product = await this.getProduct(item.productId);
+          return {
+            ...item,
+            productName: product?.itemName,
+            unit: product?.unit,
+          };
+        })
+      );
+
+      const customer = await this.getCustomer(invoice.customerId);
+
+      fullInvoices.push({
+        ...invoice,
+        items: itemsWithDetails,
+        customerName: customer?.name,
+      });
+    }
+
+    return fullInvoices;
+  }
+
+  async getSalesInvoice(id: string): Promise<FullSalesInvoice | undefined> {
+    const [invoice] = await db
+      .select()
+      .from(salesInvoices)
+      .where(eq(salesInvoices.id, id));
+
+    if (!invoice) return undefined;
+
+    const items = await db
+      .select()
+      .from(salesInvoiceItems)
+      .where(eq(salesInvoiceItems.invoiceId, invoice.id));
+
+    const itemsWithDetails = await Promise.all(
+      items.map(async (item) => {
+        const product = await this.getProduct(item.productId);
+        return {
+          ...item,
+          productName: product?.itemName,
+          unit: product?.unit,
+        };
+      })
+    );
+
+    const customer = await this.getCustomer(invoice.customerId);
+
+    return {
+      ...invoice,
+      items: itemsWithDetails,
+      customerName: customer?.name,
+    };
+  }
+
+  async updateSalesInvoiceDraft(id: string, insertInvoice: InsertFullSalesInvoice): Promise<FullSalesInvoice> {
+    return await db.transaction(async (tx) => {
+      // Check if invoice exists and is still a draft
+      const [existingInvoice] = await tx
+        .select()
+        .from(salesInvoices)
+        .where(eq(salesInvoices.id, id));
+
+      if (!existingInvoice) {
+        throw new Error("الفاتورة غير موجودة");
+      }
+
+      if (existingInvoice.status !== "مسودة") {
+        throw new Error("لا يمكن تعديل فاتورة منشورة");
+      }
+
+      // Compute totals
+      const totals = await this.computeSalesInvoiceTotals(
+        insertInvoice.items.map(item => ({
+          productId: item.productId,
+          quantity: parseFloat(item.quantity.toString()),
+          unitPrice: parseFloat(item.unitPrice.toString()),
+        }))
+      );
+
+      // Update invoice header
+      const [invoice] = await tx
+        .update(salesInvoices)
+        .set({
+          invoiceNumber: insertInvoice.invoiceNumber,
+          invoiceDate: new Date(insertInvoice.invoiceDate),
+          customerId: insertInvoice.customerId,
+          totalBeforeTax: totals.subtotal,
+          taxRate: insertInvoice.taxRate?.toString() || "0.15",
+          taxAmount: totals.taxAmount,
+          totalAfterTax: totals.total,
+          totalCost: totals.totalCost,
+          notes: insertInvoice.notes || null,
+        })
+        .where(eq(salesInvoices.id, id))
+        .returning();
+
+      // Delete old items
+      await tx.delete(salesInvoiceItems).where(eq(salesInvoiceItems.invoiceId, id));
+
+      // Create new items
+      const items = [];
+      for (const item of insertInvoice.items) {
+        const product = await this.getProduct(item.productId);
+        if (!product) {
+          throw new Error(`الصنف غير موجود: ${item.productId}`);
+        }
+
+        const quantity = parseFloat(item.quantity.toString());
+        const unitPrice = parseFloat(item.unitPrice.toString());
+        const costPrice = parseFloat(product.costPrice);
+        const total = quantity * unitPrice;
+        const totalCost = quantity * costPrice;
+
+        const [invoiceItem] = await tx
+          .insert(salesInvoiceItems)
+          .values({
+            invoiceId: invoice.id,
+            productId: item.productId,
+            quantity: quantity.toString(),
+            unitPrice: unitPrice.toString(),
+            total: total.toFixed(2),
+            costPrice: costPrice.toString(),
+            totalCost: totalCost.toFixed(2),
+          })
+          .returning();
+
+        items.push({
+          ...invoiceItem,
+          productName: product.itemName,
+          unit: product.unit,
+        });
+      }
+
+      const customer = await this.getCustomer(invoice.customerId);
+
+      return {
+        ...invoice,
+        items,
+        customerName: customer?.name,
+      };
+    });
+  }
+
+  async deleteSalesInvoiceDraft(id: string): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [invoice] = await tx
+        .select()
+        .from(salesInvoices)
+        .where(eq(salesInvoices.id, id));
+
+      if (!invoice) {
+        return false;
+      }
+
+      if (invoice.status !== "مسودة") {
+        throw new Error("لا يمكن حذف فاتورة منشورة");
+      }
+
+      // Delete items
+      await tx.delete(salesInvoiceItems).where(eq(salesInvoiceItems.invoiceId, id));
+
+      // Delete invoice
+      await tx.delete(salesInvoices).where(eq(salesInvoices.id, id));
+
+      return true;
+    });
+  }
+
+  async postSalesInvoice(id: string): Promise<FullSalesInvoice> {
+    return await db.transaction(async (tx) => {
+      // Get invoice
+      const [invoice] = await tx
+        .select()
+        .from(salesInvoices)
+        .where(eq(salesInvoices.id, id));
+
+      if (!invoice) {
+        throw new Error("الفاتورة غير موجودة");
+      }
+
+      if (invoice.status === "منشورة") {
+        throw new Error("الفاتورة منشورة مسبقاً");
+      }
+
+      // Get invoice items
+      const items = await tx
+        .select()
+        .from(salesInvoiceItems)
+        .where(eq(salesInvoiceItems.invoiceId, id));
+
+      // Check stock availability
+      for (const item of items) {
+        const [product] = await tx
+          .select()
+          .from(products)
+          .where(eq(products.id, item.productId));
+
+        if (!product) {
+          throw new Error(`الصنف غير موجود: ${item.productId}`);
+        }
+
+        const availableQty = parseFloat(product.quantityOnHand);
+        const requiredQty = parseFloat(item.quantity);
+
+        if (availableQty < requiredQty) {
+          throw new Error(`كمية غير كافية للصنف "${product.itemName}". المتوفر: ${availableQty}، المطلوب: ${requiredQty}`);
+        }
+      }
+
+      // Get customer
+      const [customer] = await tx
+        .select()
+        .from(customers)
+        .where(eq(customers.id, invoice.customerId));
+
+      if (!customer || !customer.accountId) {
+        throw new Error("العميل غير موجود أو ليس له حساب محاسبي مرتبط");
+      }
+
+      // Get or create revenue account
+      let [revenueAccount] = await tx.select().from(accounts).where(eq(accounts.code, "4100"));
+      if (!revenueAccount) {
+        [revenueAccount] = await tx
+          .insert(accounts)
+          .values({
+            code: "4100",
+            name: "إيرادات المبيعات",
+            type: "إيرادات",
+            balance: "0",
+            isActive: 1,
+          })
+          .returning();
+      }
+
+      // Get or create VAT payable account
+      let [vatAccount] = await tx.select().from(accounts).where(eq(accounts.code, "2310"));
+      if (!vatAccount) {
+        [vatAccount] = await tx
+          .insert(accounts)
+          .values({
+            code: "2310",
+            name: "ضريبة القيمة المضافة المستحقة",
+            type: "خصوم",
+            balance: "0",
+            isActive: 1,
+          })
+          .returning();
+      }
+
+      // Get or create COGS account
+      let [cogsAccount] = await tx.select().from(accounts).where(eq(accounts.code, "5100"));
+      if (!cogsAccount) {
+        [cogsAccount] = await tx
+          .insert(accounts)
+          .values({
+            code: "5100",
+            name: "تكلفة البضاعة المباعة",
+            type: "مصروفات",
+            balance: "0",
+            isActive: 1,
+          })
+          .returning();
+      }
+
+      // Get or create Inventory account
+      let [inventoryAccount] = await tx.select().from(accounts).where(eq(accounts.code, "1310"));
+      if (!inventoryAccount) {
+        [inventoryAccount] = await tx
+          .insert(accounts)
+          .values({
+            code: "1310",
+            name: "المخزون",
+            type: "أصول",
+            balance: "0",
+            isActive: 1,
+          })
+          .returning();
+      }
+
+      // Create revenue entry
+      const [revenueEntry] = await tx
+        .insert(entries)
+        .values({
+          entryNumber: `INV-${invoice.invoiceNumber}`,
+          date: invoice.invoiceDate,
+          description: `قيد إيرادات فاتورة مبيعات رقم ${invoice.invoiceNumber}`,
+          totalDebit: invoice.totalAfterTax,
+          totalCredit: invoice.totalAfterTax,
+          isBalanced: 1,
+        })
+        .returning();
+
+      // Create revenue entry lines and update account balances
+      await tx.insert(entryLines).values({
+        entryId: revenueEntry.id,
+        accountId: customer.accountId,
+        debit: invoice.totalAfterTax,
+        credit: "0",
+        description: `مدين: ${customer.name}`,
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric + ${invoice.totalAfterTax}::numeric` })
+        .where(eq(accounts.id, customer.accountId));
+
+      await tx.insert(entryLines).values({
+        entryId: revenueEntry.id,
+        accountId: revenueAccount.id,
+        debit: "0",
+        credit: invoice.totalBeforeTax,
+        description: "إيرادات المبيعات",
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric - ${invoice.totalBeforeTax}::numeric` })
+        .where(eq(accounts.id, revenueAccount.id));
+
+      await tx.insert(entryLines).values({
+        entryId: revenueEntry.id,
+        accountId: vatAccount.id,
+        debit: "0",
+        credit: invoice.taxAmount,
+        description: "ضريبة القيمة المضافة",
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric - ${invoice.taxAmount}::numeric` })
+        .where(eq(accounts.id, vatAccount.id));
+
+      // Create cost entry
+      const [costEntry] = await tx
+        .insert(entries)
+        .values({
+          entryNumber: `COGS-${invoice.invoiceNumber}`,
+          date: invoice.invoiceDate,
+          description: `قيد تكلفة فاتورة مبيعات رقم ${invoice.invoiceNumber}`,
+          totalDebit: invoice.totalCost,
+          totalCredit: invoice.totalCost,
+          isBalanced: 1,
+        })
+        .returning();
+
+      // Create cost entry lines and update account balances
+      await tx.insert(entryLines).values({
+        entryId: costEntry.id,
+        accountId: cogsAccount.id,
+        debit: invoice.totalCost,
+        credit: "0",
+        description: "تكلفة البضاعة المباعة",
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric + ${invoice.totalCost}::numeric` })
+        .where(eq(accounts.id, cogsAccount.id));
+
+      await tx.insert(entryLines).values({
+        entryId: costEntry.id,
+        accountId: inventoryAccount.id,
+        debit: "0",
+        credit: invoice.totalCost,
+        description: "خصم من المخزون",
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric - ${invoice.totalCost}::numeric` })
+        .where(eq(accounts.id, inventoryAccount.id));
+
+      // Deduct quantities and create stock movements
+      for (const item of items) {
+        const [product] = await tx
+          .select()
+          .from(products)
+          .where(eq(products.id, item.productId));
+
+        const quantityBefore = parseFloat(product!.quantityOnHand);
+        const quantity = parseFloat(item.quantity);
+        const quantityAfter = quantityBefore - quantity;
+
+        // Update product quantity
+        await tx
+          .update(products)
+          .set({ quantityOnHand: quantityAfter.toString() })
+          .where(eq(products.id, item.productId));
+
+        // Create stock movement
+        await tx.insert(stockMovements).values({
+          productId: item.productId,
+          movementType: "فاتورة مبيعات",
+          referenceId: invoice.id,
+          referenceNumber: invoice.invoiceNumber,
+          quantity: (-quantity).toString(), // Negative for outbound
+          quantityBefore: quantityBefore.toString(),
+          quantityAfter: quantityAfter.toString(),
+          movementDate: invoice.invoiceDate,
+          notes: `فاتورة مبيعات رقم ${invoice.invoiceNumber}`,
+        });
+      }
+
+      // Update customer balance
+      const newCustomerBalance = parseFloat(customer.currentBalance) + parseFloat(invoice.totalAfterTax);
+      await tx
+        .update(customers)
+        .set({ currentBalance: newCustomerBalance.toString() })
+        .where(eq(customers.id, invoice.customerId));
+
+      // Update invoice status
+      const [postedInvoice] = await tx
+        .update(salesInvoices)
+        .set({
+          status: "منشورة",
+          entryId: revenueEntry.id,
+          costEntryId: costEntry.id,
+          postedAt: new Date(),
+        })
+        .where(eq(salesInvoices.id, id))
+        .returning();
+
+      // Return full invoice
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          const product = await this.getProduct(item.productId);
+          return {
+            ...item,
+            productName: product?.itemName,
+            unit: product?.unit,
+          };
+        })
+      );
+
+      return {
+        ...postedInvoice,
+        items: itemsWithDetails,
+        customerName: customer.name,
+      };
+    });
   }
 }
 

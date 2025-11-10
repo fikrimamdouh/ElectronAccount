@@ -23,6 +23,19 @@ The system is built as a monolithic ERP application with a modular design, featu
   - Cannot delete customers with non-zero account balances (throws descriptive Arabic error)
   - Real-time balance tracking with color-coded display (green for debit, red for credit)
   - Comprehensive error handling with loading/error states and retry functionality
+
+- ✅ **Sales Invoices (فواتير المبيعات)** - COMPLETED FIRST CORE MODULE:
+  - **Database Schema**: `salesInvoices`, `salesInvoiceItems`, `stockMovements` tables
+  - **Draft/Posted Workflow**: Invoices start as drafts, can be edited/deleted, then posted permanently
+  - **Stock Integration**: Automatic inventory deduction with full audit trail via `stockMovements` table
+  - **Accounting Integration**: 
+    - Revenue entry (Debit: Customer, Credit: Revenue + VAT)
+    - Cost entry (Debit: COGS, Credit: Inventory)
+    - Both entries created atomically in single PostgreSQL transaction
+  - **Customer Balance**: Automatic update of customer account balance
+  - **Saudi VAT Compliance**: 15% tax rate with separate tracking
+  - **Full UI**: Complete interface with multi-item invoices, automatic totals calculation, draft/post controls
+  - **Transaction Safety**: All posting operations wrapped in atomic PostgreSQL transactions
   
 - ✅ **Sidebar Navigation**: Created "البيانات الأساسية" (Master Data) section in sidebar for shared data management
   - Customers management (إدارة بيانات العملاء) → `/master/customers`

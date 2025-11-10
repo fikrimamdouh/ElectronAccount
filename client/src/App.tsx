@@ -53,7 +53,7 @@ import ItemMovement from "@/pages/inventory/reports/ItemMovement";
 import SalesCustomers from "@/pages/sales/Customers";
 import Quotations from "@/pages/sales/Quotations";
 import SalesOrders from "@/pages/sales/Orders";
-import SalesInvoices from "@/pages/sales/Invoices";
+import SalesInvoices from "@/pages/sales/SalesInvoices";
 import SalesReturns from "@/pages/sales/Returns";
 import SalesReport from "@/pages/sales/reports/SalesReport";
 import SalesCustomerBalances from "@/pages/sales/reports/CustomerBalances";

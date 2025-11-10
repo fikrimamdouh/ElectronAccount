@@ -6,10 +6,12 @@ import {
   insertFullEntrySchema,
   insertProductSchema,
   insertCustomerSchema,
+  insertFullSalesInvoiceSchema,
   type InsertAccount,
   type InsertFullEntry,
   type InsertProduct,
   type InsertCustomer,
+  type InsertFullSalesInvoice,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -399,6 +401,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting customer:", error);
       res.status(500).json({ error: "فشل في حذف العميل" });
+    }
+  });
+
+  // Sales Invoices Routes
+  app.get("/api/sales-invoices", async (req, res) => {
+    try {
+      const filters: any = {};
+      
+      if (req.query.status) {
+        filters.status = req.query.status as string;
+      }
+      if (req.query.customerId) {
+        filters.customerId = req.query.customerId as string;
+      }
+      if (req.query.from) {
+        filters.from = new Date(req.query.from as string);
+      }
+      if (req.query.to) {
+        filters.to = new Date(req.query.to as string);
+      }
+
+      const invoices = await storage.getSalesInvoices(filters);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching sales invoices:", error);
+      res.status(500).json({ error: "فشل في جلب الفواتير" });
+    }
+  });
+
+  app.get("/api/sales-invoices/:id", async (req, res) => {
+    try {
+      const invoice = await storage.getSalesInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "الفاتورة غير موجودة" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching sales invoice:", error);
+      res.status(500).json({ error: "فشل في جلب الفاتورة" });
+    }
+  });
+
+  app.post("/api/sales-invoices", async (req, res) => {
+    try {
+      const validatedData = insertFullSalesInvoiceSchema.parse(req.body);
+
+      // Check if invoice number already exists
+      const allInvoices = await storage.getSalesInvoices();
+      const existing = allInvoices.find(inv => inv.invoiceNumber === validatedData.invoiceNumber);
+      if (existing) {
+        return res.status(400).json({ error: "رقم الفاتورة موجود بالفعل" });
+      }
+
+      const invoice = await storage.createSalesInvoiceDraft(validatedData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error creating sales invoice:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في إنشاء الفاتورة" 
+      });
+    }
+  });
+
+  app.put("/api/sales-invoices/:id", async (req, res) => {
+    try {
+      const validatedData = insertFullSalesInvoiceSchema.parse(req.body);
+      const invoice = await storage.updateSalesInvoiceDraft(req.params.id, validatedData);
+      res.json(invoice);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error updating sales invoice:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في تحديث الفاتورة" 
+      });
+    }
+  });
+
+  app.delete("/api/sales-invoices/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSalesInvoiceDraft(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الفاتورة غير موجودة" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting sales invoice:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في حذف الفاتورة" 
+      });
+    }
+  });
+
+  app.post("/api/sales-invoices/:id/post", async (req, res) => {
+    try {
+      const invoice = await storage.postSalesInvoice(req.params.id);
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error posting sales invoice:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في نشر الفاتورة" 
+      });
     }
   });
 
