@@ -18,6 +18,8 @@ import {
   type InsertFullSalesInvoice,
   type FullSalesInvoice,
   type InvoiceStatus,
+  type FullReceiptVoucher,
+  type InsertFullReceiptVoucher,
   accounts,
   entries,
   entryLines,
@@ -26,6 +28,8 @@ import {
   salesInvoices,
   salesInvoiceItems,
   stockMovements,
+  receiptVouchers,
+  receiptVoucherAllocations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
