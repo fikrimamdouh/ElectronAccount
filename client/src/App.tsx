@@ -54,6 +54,7 @@ import SalesCustomers from "@/pages/sales/Customers";
 import Quotations from "@/pages/sales/Quotations";
 import SalesOrders from "@/pages/sales/Orders";
 import SalesInvoices from "@/pages/sales/SalesInvoices";
+import ReceiptVouchers from "@/pages/sales/ReceiptVouchers";
 import SalesReturns from "@/pages/sales/Returns";
 import SalesReport from "@/pages/sales/reports/SalesReport";
 import SalesCustomerBalances from "@/pages/sales/reports/CustomerBalances";
@@ -249,6 +250,7 @@ function Router() {
       <Route path="/sales/quotations" component={Quotations} />
       <Route path="/sales/orders" component={SalesOrders} />
       <Route path="/sales/invoices" component={SalesInvoices} />
+      <Route path="/sales/receipt-vouchers" component={ReceiptVouchers} />
       <Route path="/sales/returns" component={SalesReturns} />
       <Route path="/sales/reports/sales-report" component={SalesReport} />
       <Route path="/sales/reports/customer-balances" component={SalesCustomerBalances} />

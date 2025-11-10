@@ -36,6 +36,24 @@ The system is built as a monolithic ERP application with a modular design, featu
   - **Saudi VAT Compliance**: 15% tax rate with separate tracking
   - **Full UI**: Complete interface with multi-item invoices, automatic totals calculation, draft/post controls
   - **Transaction Safety**: All posting operations wrapped in atomic PostgreSQL transactions
+
+- ✅ **Receipt Vouchers (سندات القبض)** - BACKEND COMPLETED:
+  - **Database Schema**: `receiptVouchers`, `receiptVoucherAllocations` tables
+  - **Draft/Posted Workflow**: Vouchers start as drafts, can be edited/deleted, then posted permanently
+  - **Payment Methods**: Support for Cash (نقداً), Bank Transfer (تحويل بنكي), and Check (شيك) with check details
+  - **Invoice Allocations**: Optional allocation to specific sales invoices for better tracking
+  - **Accounting Integration**: 
+    - Debit: Bank/Cash account (based on payment method)
+    - Credit: Customer account
+    - Automatic customer balance reduction
+    - All entries created atomically in single PostgreSQL transaction
+  - **Comprehensive Validations**:
+    - Amounts must be positive (> 0)
+    - Allocations cannot exceed voucher amount (partial allocations allowed)
+    - Allocated invoices must be posted and belong to same customer
+    - Re-validation at posting time for data integrity
+  - **Transaction Safety**: All posting operations wrapped in atomic PostgreSQL transactions
+  - **UI**: Pending implementation
   
 - ✅ **Sidebar Navigation**: Created "البيانات الأساسية" (Master Data) section in sidebar for shared data management
   - Customers management (إدارة بيانات العملاء) → `/master/customers`
@@ -84,7 +102,13 @@ The system is built as a monolithic ERP application with a modular design, featu
 **System Design Choices:**
 - **Monolithic Architecture:** A single codebase for both frontend and backend for simplified deployment and management, while maintaining modularity within the application structure.
 - **Data Validation:** Strict data validation using Zod on the backend to ensure data integrity.
-- **Error Handling:** Comprehensive error handling implemented across all API endpoints with user-friendly toast notifications and detailed error states.
+- **Structured Error Handling:** Custom error hierarchy (AppError base class) with typed errors:
+  - ValidationError (400): Business logic violations
+  - NotFoundError (404): Missing entities
+  - ConflictError (409): Duplicate entries
+  - InvalidStateError (400): State violations
+  - Centralized Express middleware for consistent HTTP status codes
+  - Clear separation between user-fixable errors (4xx) and server faults (5xx)
 - **Transaction Safety:** All critical database operations that span multiple tables use PostgreSQL transactions to prevent partial writes and maintain data consistency.
 - **Responsive UI States:** Loading spinners, error messages with retry buttons, and empty states provide clear feedback to users.
 
