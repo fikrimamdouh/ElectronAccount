@@ -123,8 +123,79 @@ import Carriers from "@/pages/shipping/Carriers";
 import Shipments from "@/pages/shipping/Shipments";
 import Tracking from "@/pages/shipping/Tracking";
 
+// CRM Module
+import Leads from "@/pages/crm/Leads";
+import Opportunities from "@/pages/crm/Opportunities";
+import Activities from "@/pages/crm/Activities";
+import Campaigns from "@/pages/crm/Campaigns";
+import CRMTasks from "@/pages/crm/Tasks";
+import CRMAnalytics from "@/pages/crm/Analytics";
+import CRMReports from "@/pages/crm/Reports";
+
+// Budgets Module
+import AnnualBudgets from "@/pages/budgets/AnnualBudgets";
+import ActualVsBudget from "@/pages/budgets/ActualVsBudget";
+import Forecasts from "@/pages/budgets/Forecasts";
+import Variances from "@/pages/budgets/Variances";
+import BudgetReports from "@/pages/budgets/BudgetReports";
+
+// Quality Module
+import QualityStandards from "@/pages/quality/QualityStandards";
+import Inspections from "@/pages/quality/Inspections";
+import NonConformance from "@/pages/quality/NonConformance";
+import CorrectiveActions from "@/pages/quality/CorrectiveActions";
+import QualityReports from "@/pages/quality/QualityReports";
+
+// Maintenance Module
+import MaintenanceSchedule from "@/pages/maintenance/MaintenanceSchedule";
+import WorkOrders from "@/pages/maintenance/WorkOrders";
+import SpareParts from "@/pages/maintenance/SpareParts";
+import MaintenanceCosts from "@/pages/maintenance/MaintenanceCosts";
+import MaintenanceReports from "@/pages/maintenance/MaintenanceReports";
+
+// Documents Module
+import DocumentStorage from "@/pages/documents/DocumentStorage";
+import DocumentCategories from "@/pages/documents/Categories";
+import DocumentSearch from "@/pages/documents/Search";
+import DocumentArchive from "@/pages/documents/Archive";
+
+// Loyalty Module
+import LoyaltyPrograms from "@/pages/loyalty/Programs";
+import LoyaltyPoints from "@/pages/loyalty/Points";
+import Coupons from "@/pages/loyalty/Coupons";
+import LoyaltyTiers from "@/pages/loyalty/Tiers";
+import LoyaltyReports from "@/pages/loyalty/LoyaltyReports";
+
+// BI Module
+import BIDashboards from "@/pages/bi/Dashboards";
+import KPIs from "@/pages/bi/KPIs";
+import CustomReports from "@/pages/bi/CustomReports";
+import DataAnalysis from "@/pages/bi/DataAnalysis";
+import DataExport from "@/pages/bi/DataExport";
+import Trends from "@/pages/bi/Trends";
+
+// Distributors Module
+import DistributorList from "@/pages/distributors/DistributorList";
+import Commissions from "@/pages/distributors/Commissions";
+import Territories from "@/pages/distributors/Territories";
+import DistributorTargets from "@/pages/distributors/Targets";
+import DistributorReports from "@/pages/distributors/DistributorReports";
+
+// Meetings Module
+import MeetingsList from "@/pages/meetings/MeetingsList";
+import MeetingMinutes from "@/pages/meetings/Minutes";
+import MeetingDecisions from "@/pages/meetings/Decisions";
+import MeetingFollowup from "@/pages/meetings/Followup";
+
+// Risk Management Module
+import RiskIdentification from "@/pages/risk-management/RiskIdentification";
+import RiskAssessment from "@/pages/risk-management/RiskAssessment";
+import RiskMitigation from "@/pages/risk-management/Mitigation";
+import RiskMonitoring from "@/pages/risk-management/Monitoring";
+
 // Settings
 import CompanySettings from "@/pages/settings/CompanySettings";
+import ModuleManagement from "@/pages/settings/ModuleManagement";
 import SettingsBranches from "@/pages/settings/SettingsBranches";
 import SettingsCurrencies from "@/pages/settings/SettingsCurrencies";
 import SettingsUsers from "@/pages/settings/Users";
@@ -243,8 +314,79 @@ function Router() {
       <Route path="/shipping/shipments" component={Shipments} />
       <Route path="/shipping/tracking" component={Tracking} />
 
+      {/* 14. CRM Module */}
+      <Route path="/crm/leads" component={Leads} />
+      <Route path="/crm/opportunities" component={Opportunities} />
+      <Route path="/crm/activities" component={Activities} />
+      <Route path="/crm/campaigns" component={Campaigns} />
+      <Route path="/crm/tasks" component={CRMTasks} />
+      <Route path="/crm/analytics" component={CRMAnalytics} />
+      <Route path="/crm/reports" component={CRMReports} />
+
+      {/* 15. Budgets Module */}
+      <Route path="/budgets/annual" component={AnnualBudgets} />
+      <Route path="/budgets/actual-vs-budget" component={ActualVsBudget} />
+      <Route path="/budgets/forecasts" component={Forecasts} />
+      <Route path="/budgets/variances" component={Variances} />
+      <Route path="/budgets/reports" component={BudgetReports} />
+
+      {/* 16. Quality Module */}
+      <Route path="/quality/standards" component={QualityStandards} />
+      <Route path="/quality/inspections" component={Inspections} />
+      <Route path="/quality/non-conformance" component={NonConformance} />
+      <Route path="/quality/corrective-actions" component={CorrectiveActions} />
+      <Route path="/quality/reports" component={QualityReports} />
+
+      {/* 17. Maintenance Module */}
+      <Route path="/maintenance/schedule" component={MaintenanceSchedule} />
+      <Route path="/maintenance/work-orders" component={WorkOrders} />
+      <Route path="/maintenance/spare-parts" component={SpareParts} />
+      <Route path="/maintenance/costs" component={MaintenanceCosts} />
+      <Route path="/maintenance/reports" component={MaintenanceReports} />
+
+      {/* 18. Documents Module */}
+      <Route path="/documents/storage" component={DocumentStorage} />
+      <Route path="/documents/categories" component={DocumentCategories} />
+      <Route path="/documents/search" component={DocumentSearch} />
+      <Route path="/documents/archive" component={DocumentArchive} />
+
+      {/* 19. Loyalty Module */}
+      <Route path="/loyalty/programs" component={LoyaltyPrograms} />
+      <Route path="/loyalty/points" component={LoyaltyPoints} />
+      <Route path="/loyalty/coupons" component={Coupons} />
+      <Route path="/loyalty/tiers" component={LoyaltyTiers} />
+      <Route path="/loyalty/reports" component={LoyaltyReports} />
+
+      {/* 20. BI Module */}
+      <Route path="/bi/dashboards" component={BIDashboards} />
+      <Route path="/bi/kpis" component={KPIs} />
+      <Route path="/bi/custom-reports" component={CustomReports} />
+      <Route path="/bi/data-analysis" component={DataAnalysis} />
+      <Route path="/bi/data-export" component={DataExport} />
+      <Route path="/bi/trends" component={Trends} />
+
+      {/* 21. Distributors Module */}
+      <Route path="/distributors/list" component={DistributorList} />
+      <Route path="/distributors/commissions" component={Commissions} />
+      <Route path="/distributors/territories" component={Territories} />
+      <Route path="/distributors/targets" component={DistributorTargets} />
+      <Route path="/distributors/reports" component={DistributorReports} />
+
+      {/* 22. Meetings Module */}
+      <Route path="/meetings/list" component={MeetingsList} />
+      <Route path="/meetings/minutes" component={MeetingMinutes} />
+      <Route path="/meetings/decisions" component={MeetingDecisions} />
+      <Route path="/meetings/followup" component={MeetingFollowup} />
+
+      {/* 23. Risk Management Module */}
+      <Route path="/risk-management/identification" component={RiskIdentification} />
+      <Route path="/risk-management/assessment" component={RiskAssessment} />
+      <Route path="/risk-management/mitigation" component={RiskMitigation} />
+      <Route path="/risk-management/monitoring" component={RiskMonitoring} />
+
       {/* Settings */}
       <Route path="/settings/company" component={CompanySettings} />
+      <Route path="/settings/modules" component={ModuleManagement} />
       <Route path="/settings/branches" component={SettingsBranches} />
       <Route path="/settings/currencies" component={SettingsCurrencies} />
       <Route path="/settings/users" component={SettingsUsers} />

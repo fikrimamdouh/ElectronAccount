@@ -52,6 +52,24 @@ import {
   TruckIcon,
   MessageSquare,
   Award,
+  Megaphone,
+  Gift,
+  LayoutDashboard as BIIcon,
+  AlertTriangle,
+  Shield,
+  FolderOpen,
+  Ticket,
+  Trophy,
+  Star,
+  MapPin,
+  CheckCircle,
+  Eye,
+  Scale,
+  XCircle,
+  ClipboardCheck,
+  Archive,
+  Search as SearchIcon,
+  LineChart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -573,6 +591,336 @@ const menuItems: MenuItem[] = [
     ],
   },
 
+  // 14. إدارة علاقات العملاء (CRM)
+  {
+    title: "إدارة علاقات العملاء",
+    icon: Users,
+    items: [
+      {
+        title: "العملاء المحتملون",
+        url: "/crm/leads",
+        icon: UserPlus,
+      },
+      {
+        title: "الفرص البيعية",
+        url: "/crm/opportunities",
+        icon: TrendingUp,
+      },
+      {
+        title: "الأنشطة والاتصالات",
+        url: "/crm/activities",
+        icon: Calendar,
+      },
+      {
+        title: "الحملات التسويقية",
+        url: "/crm/campaigns",
+        icon: Megaphone,
+      },
+      {
+        title: "المهام والمتابعة",
+        url: "/crm/tasks",
+        icon: ClipboardList,
+      },
+      {
+        title: "تحليلات العملاء",
+        url: "/crm/analytics",
+        icon: BarChart3,
+      },
+      {
+        title: "تقارير CRM",
+        url: "/crm/reports",
+        icon: FileText,
+      },
+    ],
+  },
+
+  // 15. الميزانيات والتخطيط المالي
+  {
+    title: "الميزانيات والتخطيط",
+    icon: Calculator,
+    items: [
+      {
+        title: "الميزانيات السنوية",
+        url: "/budgets/annual",
+        icon: FileSpreadsheet,
+      },
+      {
+        title: "الفعلي مقابل المخطط",
+        url: "/budgets/actual-vs-budget",
+        icon: PieChart,
+      },
+      {
+        title: "التنبؤات المالية",
+        url: "/budgets/forecasts",
+        icon: LineChart,
+      },
+      {
+        title: "تحليل الانحرافات",
+        url: "/budgets/variances",
+        icon: AlertTriangle,
+      },
+      {
+        title: "تقارير الميزانيات",
+        url: "/budgets/reports",
+        icon: FileText,
+      },
+    ],
+  },
+
+  // 16. إدارة الجودة
+  {
+    title: "إدارة الجودة",
+    icon: Award,
+    items: [
+      {
+        title: "معايير الجودة",
+        url: "/quality/standards",
+        icon: Award,
+      },
+      {
+        title: "الفحوصات",
+        url: "/quality/inspections",
+        icon: ClipboardCheck,
+      },
+      {
+        title: "عدم المطابقة",
+        url: "/quality/non-conformance",
+        icon: XCircle,
+      },
+      {
+        title: "الإجراءات التصحيحية",
+        url: "/quality/corrective-actions",
+        icon: Wrench,
+      },
+      {
+        title: "تقارير الجودة",
+        url: "/quality/reports",
+        icon: FileText,
+      },
+    ],
+  },
+
+  // 17. الصيانة
+  {
+    title: "الصيانة",
+    icon: Wrench,
+    items: [
+      {
+        title: "جدول الصيانة",
+        url: "/maintenance/schedule",
+        icon: Calendar,
+      },
+      {
+        title: "طلبات الصيانة",
+        url: "/maintenance/work-orders",
+        icon: ClipboardList,
+      },
+      {
+        title: "قطع الغيار",
+        url: "/maintenance/spare-parts",
+        icon: Package,
+      },
+      {
+        title: "تكاليف الصيانة",
+        url: "/maintenance/costs",
+        icon: DollarSign,
+      },
+      {
+        title: "تقارير الصيانة",
+        url: "/maintenance/reports",
+        icon: FileText,
+      },
+    ],
+  },
+
+  // 18. إدارة المستندات
+  {
+    title: "إدارة المستندات",
+    icon: FolderOpen,
+    items: [
+      {
+        title: "تخزين المستندات",
+        url: "/documents/storage",
+        icon: FolderOpen,
+      },
+      {
+        title: "تصنيف المستندات",
+        url: "/documents/categories",
+        icon: FolderKanban,
+      },
+      {
+        title: "البحث في المستندات",
+        url: "/documents/search",
+        icon: SearchIcon,
+      },
+      {
+        title: "الأرشيف",
+        url: "/documents/archive",
+        icon: Archive,
+      },
+    ],
+  },
+
+  // 19. نقاط الولاء
+  {
+    title: "نقاط الولاء",
+    icon: Gift,
+    items: [
+      {
+        title: "برامج الولاء",
+        url: "/loyalty/programs",
+        icon: Gift,
+      },
+      {
+        title: "النقاط والمكافآت",
+        url: "/loyalty/points",
+        icon: Star,
+      },
+      {
+        title: "الكوبونات والعروض",
+        url: "/loyalty/coupons",
+        icon: Ticket,
+      },
+      {
+        title: "مستويات العضوية",
+        url: "/loyalty/tiers",
+        icon: Trophy,
+      },
+      {
+        title: "تقارير الولاء",
+        url: "/loyalty/reports",
+        icon: FileText,
+      },
+    ],
+  },
+
+  // 20. التقارير التحليلية (BI)
+  {
+    title: "التقارير التحليلية",
+    icon: BIIcon,
+    items: [
+      {
+        title: "لوحات التحكم التحليلية",
+        url: "/bi/dashboards",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "مؤشرات الأداء KPIs",
+        url: "/bi/kpis",
+        icon: Target,
+      },
+      {
+        title: "التقارير المخصصة",
+        url: "/bi/custom-reports",
+        icon: FileBarChart,
+      },
+      {
+        title: "تحليل البيانات",
+        url: "/bi/data-analysis",
+        icon: BarChart3,
+      },
+      {
+        title: "تصدير البيانات",
+        url: "/bi/data-export",
+        icon: FileOutput,
+      },
+      {
+        title: "الاتجاهات والتنبؤات",
+        url: "/bi/trends",
+        icon: TrendingUp,
+      },
+    ],
+  },
+
+  // 21. الوكلاء والموزعون
+  {
+    title: "الوكلاء والموزعون",
+    icon: Users,
+    items: [
+      {
+        title: "الوكلاء والموزعون",
+        url: "/distributors/list",
+        icon: Users,
+      },
+      {
+        title: "العمولات",
+        url: "/distributors/commissions",
+        icon: DollarSign,
+      },
+      {
+        title: "المناطق الجغرافية",
+        url: "/distributors/territories",
+        icon: MapPin,
+      },
+      {
+        title: "الحصص والأهداف",
+        url: "/distributors/targets",
+        icon: Target,
+      },
+      {
+        title: "تقارير الوكلاء",
+        url: "/distributors/reports",
+        icon: FileText,
+      },
+    ],
+  },
+
+  // 22. الاجتماعات واللجان
+  {
+    title: "الاجتماعات واللجان",
+    icon: Calendar,
+    items: [
+      {
+        title: "الاجتماعات",
+        url: "/meetings/list",
+        icon: Calendar,
+      },
+      {
+        title: "محاضر الاجتماعات",
+        url: "/meetings/minutes",
+        icon: FileText,
+      },
+      {
+        title: "القرارات والتوصيات",
+        url: "/meetings/decisions",
+        icon: CheckCircle,
+      },
+      {
+        title: "المتابعة والتنفيذ",
+        url: "/meetings/followup",
+        icon: Clock,
+      },
+    ],
+  },
+
+  // 23. إدارة المخاطر
+  {
+    title: "إدارة المخاطر",
+    icon: AlertTriangle,
+    items: [
+      {
+        title: "تحديد المخاطر",
+        url: "/risk-management/identification",
+        icon: AlertTriangle,
+      },
+      {
+        title: "تقييم المخاطر",
+        url: "/risk-management/assessment",
+        icon: Scale,
+      },
+      {
+        title: "خطط المعالجة",
+        url: "/risk-management/mitigation",
+        icon: Shield,
+      },
+      {
+        title: "المتابعة والرصد",
+        url: "/risk-management/monitoring",
+        icon: Eye,
+      },
+    ],
+  },
+
   // الإعدادات
   {
     title: "الإعدادات",
@@ -582,6 +930,11 @@ const menuItems: MenuItem[] = [
         title: "بيانات الشركة",
         url: "/settings/company",
         icon: Building2,
+      },
+      {
+        title: "إدارة المديولات",
+        url: "/settings/modules",
+        icon: Settings,
       },
       {
         title: "الفروع",
