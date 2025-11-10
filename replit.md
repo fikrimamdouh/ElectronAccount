@@ -1,288 +1,63 @@
 # RinaPro Business - نظام المحاسبة الشامل المتكامل
 
-## نظرة عامة
-نظام ERP متكامل لإدارة الأعمال بواجهة عربية كاملة مع دعم RTL (الكتابة من اليمين إلى اليسار). يستخدم React و Shadcn UI لواجهة احترافية وحديثة.
+## Overview
+RinaPro Business is an integrated ERP system designed for comprehensive business management. It features a full Arabic interface with RTL support, built using React and Shadcn UI for a modern and professional user experience. The system encompasses 13+ integrated modules covering financial accounting, inventory, sales, purchasing, POS, HR, fixed assets, projects, production, contracts, e-commerce, and shipping. Its primary purpose is to streamline business operations, provide financial insights, and manage various aspects of a company's workflow efficiently. The project aims to be a complete, integrated solution for businesses seeking an Arabic-first ERP system.
 
-## المديولات الرئيسية (10 وحدات متكاملة)
+## User Preferences
+The user prefers clear and concise communication. They appreciate an iterative development approach, where features are built out module by module. The user expects the agent to prioritize architectural decisions and high-level feature implementation before diving into granular details. They prefer to be consulted before any major architectural changes or significant deviations from the established design patterns. The user wants the agent to focus on implementing the core functionalities and ensuring seamless integration between modules, especially with the Financial Accounting module.
 
-| # | المديول | الحالة | الوصف |
-|---|---------|--------|-------|
-| 1 | **المحاسبة المالية** | ✅ مكتمل | إدارة الحسابات العامة، القيود اليومية، موازين المراجعة، القوائم المالية |
-| 2 | **إدارة المخزون** | ⏳ قادم | تعريف الأصناف والمخازن، تتبع الأرصدة، مراقبة الحركات، الجرد الدوري |
-| 3 | **المبيعات والعملاء** | ⏳ قادم | إدارة العملاء، عروض الأسعار، أوامر البيع، الفواتير، المرتجعات |
-| 4 | **المشتريات والموردين** | ⏳ قادم | إدارة الموردين، طلبات الشراء، استلام البضاعة، فواتير الشراء |
-| 5 | **النقدية والبنوك** | ⏳ قادم | إدارة الصناديق والبنوك، سندات القبض والصرف، تسويات البنوك |
-| 6 | **شؤون الموظفين والرواتب** | ⏳ قادم | ملفات الموظفين، الحضور، الرواتب، البدلات والاستقطاعات |
-| 7 | **الأصول الثابتة** | ⏳ قادم | تسجيل الأصول، الإهلاك، نقل الأصول، البيع أو الاستبعاد |
-| 8 | **التقارير والتحليلات** | ⏳ قادم | إعداد التقارير ولوحات التحكم المالية والإدارية |
-| 9 | **إدارة المستخدمين والصلاحيات** | ⏳ قادم | تحديد صلاحيات الوصول، الأمان، سجلات النشاط |
-| 10 | **الإعدادات العامة** | ⏳ قادم | تهيئة النظام، التعريفات الأساسية، الربط بين الوحدات |
+## System Architecture
+The system is built as a monolithic ERP application with a modular design, featuring 13 core modules plus company settings.
 
-## 📊 المديول الحالي: المحاسبة المالية (Financial Accounting)
+**UI/UX Decisions:**
+- **Language & Layout:** Full Arabic interface with comprehensive RTL (Right-to-Left) support.
+- **Components:** Utilizes Shadcn UI for a professional, modern aesthetic, including an advanced 3-level tree-view sidebar.
+- **Theming:** Supports both dark and light modes.
+- **Responsiveness:** Designed to be fully responsive across all devices.
+- **Typography:** Employs Cairo and Tajawal Arabic fonts.
+- **Dashboard:** Interactive dashboard with financial statistics.
 
-### المميزات المنفذة
-- ✅ واجهة مستخدم عربية كاملة مع دعم RTL
-- ✅ قائمة شجرية متقدمة متعددة المستويات
-- ✅ نظام محاسبة بالقيد المزدوج
-- ✅ لوحة تحكم تفاعلية مع إحصائيات مالية
-- ✅ إدارة شاملة للحسابات المالية
-- ✅ تسجيل القيود المحاسبية اليومية
-- ✅ ميزان المراجعة
-- ✅ التقارير المالية (قائمة الدخل والميزانية العمومية)
-- ✅ قاعدة بيانات PostgreSQL
-- ✅ دعم الوضع النهاري والليلي
-- ✅ تصميم متجاوب يعمل على جميع الأجهزة
+**Technical Implementations:**
+- **Frontend:**
+    - React 18 with TypeScript.
+    - Wouter for routing.
+    - TanStack Query for data management.
+    - Tailwind CSS for styling.
+    - Recharts for data visualization.
+- **Backend:**
+    - Express.js for the API server.
+    - TypeScript for type safety.
+    - Zod for data validation.
+- **Database:**
+    - PostgreSQL as the primary database.
+    - Drizzle ORM for schema management and interactions.
+    - Database migrations managed via `npm run db:push`.
 
-### هيكل القائمة الجانبية
+**Feature Specifications:**
+- **Financial Accounting:** Core module, acting as the central hub for all financial transactions, supporting double-entry bookkeeping.
+- **Modular Integration:** All other modules (Inventory, Sales, Purchasing, HR, etc.) are designed to integrate with Financial Accounting by generating automatic journal entries.
+- **Sidebar Structure:** A multi-level (3-tier) hierarchical sidebar built with Shadcn UI's Sidebar and Collapsible components, organizing over 90 pages.
+- **API Design:** RESTful API endpoints for each module, ensuring clear separation of concerns.
 
-```
-1. لوحة التحكم (Dashboard)
+**System Design Choices:**
+- **Monolithic Architecture:** A single codebase for both frontend and backend for simplified deployment and management, while maintaining modularity within the application structure.
+- **Data Validation:** Strict data validation using Zod on the backend to ensure data integrity.
+- **Error Handling:** Comprehensive error handling implemented across all API endpoints.
 
-2. البيانات الأساسية (Master Data)
-   ├─ أكواد النظام
-   │  ├─ الفترات المالية
-   │  ├─ الفروع
-   │  └─ العملات
-   ├─ دليل الحسابات
-   ├─ مراكز التكلفة
-   ├─ بيانات العملاء
-   └─ بيانات الموردين
-
-3. الحركات اليومية (Transactions)
-   ├─ قيود اليومية العامة
-   ├─ سندات القبض
-   └─ سندات الصرف
-
-4. التقارير (Reports)
-   ├─ تقارير الأستاذ العام
-   │  ├─ ميزان المراجعة
-   │  └─ كشف حساب أستاذ
-   ├─ تقارير الأستاذ المساعد
-   │  ├─ أرصدة العملاء
-   │  └─ كشف حساب عميل
-   ├─ تقارير مراكز التكلفة
-   └─ القوائم المالية
-      ├─ قائمة الدخل
-      └─ الميزانية العمومية
-
-5. عمليات نهاية الفترة (Closing)
-   ├─ إقفال القيود
-   └─ ترحيل الأرصدة
-
-6. الإعدادات (Settings)
-```
-
-## البنية التقنية
-
-### Frontend
-- React 18 مع TypeScript
-- Wouter للتوجيه
-- TanStack Query لإدارة الحالة والبيانات
-- Shadcn UI للمكونات (قائمة شجرية متعددة المستويات)
-- Tailwind CSS للتصميم
-- Recharts للرسوم البيانية
-- خطوط Cairo و Tajawal العربية
-- دعم RTL كامل
-
-### Backend
-- Express.js
-- PostgreSQL مع Drizzle ORM
-- Zod للتحقق من البيانات
-- TypeScript
-- قاعدة بيانات Neon PostgreSQL
-
-### Database
-- PostgreSQL (Neon-backed)
-- Drizzle ORM لإدارة Schema
-- Database migrations عبر `npm run db:push`
-
-## هيكل المشروع
-
-```
-client/
-  src/
-    components/
-      ui/                    # مكونات Shadcn UI
-      StatCard.tsx          # بطاقة الإحصائيات
-      app-sidebar.tsx       # قائمة شجرية متعددة المستويات
-    pages/
-      Dashboard.tsx         # لوحة التحكم
-      Accounts.tsx          # إدارة الحسابات (قديم)
-      Entries.tsx          # القيود المحاسبية (قديم)
-      TrialBalance.tsx     # ميزان المراجعة (قديم)
-      Reports.tsx          # التقارير (قديم)
-      Settings.tsx         # الإعدادات
-      master/              # البيانات الأساسية
-        FiscalPeriods.tsx
-        Branches.tsx
-        Currencies.tsx
-        ChartOfAccounts.tsx
-        CostCenters.tsx
-        Customers.tsx
-        Suppliers.tsx
-      transactions/        # الحركات اليومية
-        JournalEntries.tsx
-        Receipts.tsx
-        Payments.tsx
-      reports/            # التقارير
-        GeneralLedgerTrialBalance.tsx
-        LedgerAccount.tsx
-        CustomerBalances.tsx
-        CustomerStatement.tsx
-        CostCentersReports.tsx
-        IncomeStatement.tsx
-        BalanceSheet.tsx
-      closing/           # عمليات نهاية الفترة
-        CloseEntries.tsx
-        TransferBalances.tsx
-    App.tsx            # المكون الرئيسي
-    index.css          # الأنماط العامة
-
-server/
-  db.ts              # اتصال قاعدة البيانات
-  routes.ts          # مسارات API
-  storage.ts         # واجهة التخزين مع PostgreSQL
-
-shared/
-  schema.ts          # نماذج البيانات Drizzle
-```
-
-## نماذج البيانات (Database Schema)
-
-### Accounts (الحسابات)
-```typescript
-- id: varchar (UUID)
-- code: varchar (رمز الحساب)
-- name: text (اسم الحساب)
-- type: varchar (نوع الحساب: أصول، خصوم، إيرادات، مصروفات، حقوق ملكية)
-- balance: numeric(15,2) (الرصيد)
-- isActive: integer (حالة الحساب)
-- createdAt: timestamp
-```
-
-### Entries (القيود)
-```typescript
-- id: varchar (UUID)
-- entryNumber: varchar (رقم القيد)
-- date: timestamp (تاريخ القيد)
-- description: text (وصف القيد)
-- totalDebit: numeric(15,2) (إجمالي المدين)
-- totalCredit: numeric(15,2) (إجمالي الدائن)
-- isBalanced: integer (هل القيد متوازن)
-- createdAt: timestamp
-```
-
-### Entry Lines (سطور القيد)
-```typescript
-- id: varchar (UUID)
-- entryId: varchar (معرف القيد)
-- accountId: varchar (معرف الحساب)
-- debit: numeric(15,2) (المبلغ المدين)
-- credit: numeric(15,2) (المبلغ الدائن)
-- description: text (الوصف)
-```
-
-## واجهات API المنفذة
-
-### Accounts
-- GET /api/accounts - جلب جميع الحسابات
-- POST /api/accounts - إضافة حساب جديد
-- PUT /api/accounts/:id - تعديل حساب
-- DELETE /api/accounts/:id - حذف حساب
-
-### Entries
-- GET /api/entries - جلب جميع القيود
-- POST /api/entries - إضافة قيد جديد
-- DELETE /api/entries/:id - حذف قيد
-
-### Reports
-- GET /api/trial-balance - جلب ميزان المراجعة
-- GET /api/reports/income-statement - جلب قائمة الدخل
-- GET /api/reports/balance-sheet - جلب الميزانية العمومية
-
-### Dashboard
-- GET /api/dashboard/stats - جلب إحصائيات لوحة التحكم
-
-## التشغيل
-```bash
-npm run dev          # تشغيل التطبيق
-npm run db:push      # مزامنة Schema مع قاعدة البيانات
-```
-
-يعمل التطبيق على البورت 5000
-
-## الحالة الحالية (نوفمبر 2025)
-
-### ✅ المنجز
-1. ✅ مديول المحاسبة المالية - كامل
-   - واجهة قائمة شجرية متقدمة (3 مستويات)
-   - قاعدة بيانات PostgreSQL
-   - جميع API endpoints تعمل
-   - 19 صفحة منظمة في 4 مجلدات
-   - نظام القيد المزدوج
-   - التقارير المالية الأساسية
-
-### ⏳ قيد التطوير
-- إكمال صفحات البيانات الأساسية (الفترات المالية، الفروع، العملات، إلخ)
-- إكمال صفحات الحركات اليومية
-- إكمال صفحات التقارير المتقدمة
-
-### 📋 المخطط المستقبلي
-- مديول إدارة المخزون
-- مديول المبيعات والعملاء
-- مديول المشتريات والموردين
-- مديول النقدية والبنوك
-- مديول شؤون الموظفين والرواتب
-- مديول الأصول الثابتة
-- مديول التقارير والتحليلات المتقدمة
-- مديول إدارة المستخدمين والصلاحيات
-- مديول الإعدادات العامة
-
-## التكامل بين المديولات
-
-المحاسبة المالية هي المديول الأساسي الذي تتكامل معه جميع المديولات الأخرى:
-- **المخزون** → يولد قيود تلقائية للمشتريات والمبيعات
-- **المبيعات** → يولد قيود الإيرادات والذمم المدينة
-- **المشتريات** → يولد قيود المصروفات والذمم الدائنة
-- **النقدية** → يولد قيود الصناديق والبنوك
-- **الرواتب** → يولد قيود الرواتب والمستحقات
-- **الأصول** → يولد قيود الإهلاك والأصول
-
-## ملاحظات التطوير
-
-### معمارية الكود
-- جميع المكونات تستخدم TypeScript بشكل كامل
-- الواجهة تدعم RTL بالكامل
-- تم اتباع دليل التصميم في design_guidelines.md
-- جميع العناصر التفاعلية تحتوي على data-testid للاختبار
-- الكود منظم ومعياري لسهولة الصيانة والتطوير
-
-### القائمة الشجرية
-- استخدام Shadcn Sidebar مع Collapsible
-- دعم عدد غير محدود من المستويات
-- renderSubMenuItems متكرر للمستويات العميقة
-- SidebarMenuItem للمستوى الأول
-- SidebarMenuSubItem للمستويات الفرعية
-
-### قاعدة البيانات
-- PostgreSQL (Neon) للإنتاج
-- Drizzle ORM للـ Schema
-- استخدام `npm run db:push` للمزامنة
-- DatabaseStorage بدلاً من MemStorage
-
-### التصميم
-- ألوان احترافية تناسب التطبيقات المحاسبية
-- دعم Dark Mode كامل
-- خطوط عربية (Cairo + Tajawal)
-- نظام مسافات متسق
-- تصميم متجاوب
-
-## المتطلبات البيئية
-- Node.js 18+
-- PostgreSQL (Neon)
-- DATABASE_URL environment variable
-
-## الأمان
-- التحقق من البيانات باستخدام Zod
-- TypeScript للتحقق من الأنواع
-- معالجة الأخطاء في جميع API endpoints
+## External Dependencies
+- **Database:**
+    - PostgreSQL (with Neon for cloud-hosted PostgreSQL capabilities).
+- **Frontend Libraries:**
+    - React 18
+    - Wouter
+    - TanStack Query
+    - Shadcn UI
+    - Tailwind CSS
+    - Recharts
+- **Backend Libraries:**
+    - Express.js
+    - Drizzle ORM
+    - Zod
+- **Fonts:**
+    - Cairo
+    - Tajawal
