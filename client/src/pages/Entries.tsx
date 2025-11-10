@@ -110,7 +110,7 @@ export default function Entries() {
           onClick={() => setIsDialogOpen(true)}
           data-testid="button-new-entry"
         >
-          <PlusCircle className="w-5 h-5 ml-2" />
+          <PlusCircle className="w-5 h-5 me-2" />
           قيد جديد
         </Button>
       </div>
@@ -197,7 +197,7 @@ export default function Entries() {
           <h3 className="text-xl font-medium mb-2">لا توجد قيود محاسبية</h3>
           <p className="text-muted-foreground mb-6">ابدأ بإضافة أول قيد محاسبي</p>
           <Button onClick={() => setIsDialogOpen(true)} data-testid="button-create-first-entry">
-            <PlusCircle className="w-5 h-5 ml-2" />
+            <PlusCircle className="w-5 h-5 me-2" />
             إضافة قيد جديد
           </Button>
         </Card>
@@ -268,7 +268,7 @@ export default function Entries() {
                     onClick={() => append({ accountId: "", debit: "0", credit: "0", description: "" })}
                     data-testid="button-add-line"
                   >
-                    <PlusCircle className="w-4 h-4 ml-2" />
+                    <PlusCircle className="w-4 h-4 me-2" />
                     إضافة سطر
                   </Button>
                 </div>
@@ -364,13 +364,13 @@ export default function Entries() {
                   </div>
                   <div className="flex gap-8">
                     <div>
-                      <span className="text-muted-foreground ml-2">إجمالي المدين:</span>
+                      <span className="text-muted-foreground ms-2">إجمالي المدين:</span>
                       <span className="font-mono font-bold" data-testid="text-dialog-total-debit">
                         {totals.totalDebit.toFixed(2)} ريال
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground ml-2">إجمالي الدائن:</span>
+                      <span className="text-muted-foreground ms-2">إجمالي الدائن:</span>
                       <span className="font-mono font-bold" data-testid="text-dialog-total-credit">
                         {totals.totalCredit.toFixed(2)} ريال
                       </span>

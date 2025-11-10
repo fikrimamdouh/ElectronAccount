@@ -40,7 +40,7 @@ export default function TrialBalance() {
           </p>
         </div>
         <Button variant="outline" data-testid="button-export">
-          <Download className="w-5 h-5 ml-2" />
+          <Download className="w-5 h-5 me-2" />
           تصدير
         </Button>
       </div>
@@ -53,7 +53,7 @@ export default function TrialBalance() {
             placeholder="البحث في الحسابات..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pr-10"
+            className="pe-10"
             data-testid="input-search-trial-balance"
           />
         </div>

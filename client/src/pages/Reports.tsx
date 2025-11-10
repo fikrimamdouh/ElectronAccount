@@ -57,7 +57,7 @@ export default function Reports() {
             />
           </div>
           <Button variant="outline" data-testid="button-export-report">
-            <Download className="w-5 h-5 ml-2" />
+            <Download className="w-5 h-5 me-2" />
             تصدير PDF
           </Button>
         </div>
@@ -67,11 +67,11 @@ export default function Reports() {
       <Tabs defaultValue="income" className="space-y-6">
         <TabsList className="grid w-full md:w-auto grid-cols-2 md:grid-cols-2">
           <TabsTrigger value="income" data-testid="tab-income-statement">
-            <TrendingUp className="w-4 h-4 ml-2" />
+            <TrendingUp className="w-4 h-4 me-2" />
             قائمة الدخل
           </TabsTrigger>
           <TabsTrigger value="balance" data-testid="tab-balance-sheet">
-            <FileText className="w-4 h-4 ml-2" />
+            <FileText className="w-4 h-4 me-2" />
             الميزانية العمومية
           </TabsTrigger>
         </TabsList>

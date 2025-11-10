@@ -10,9 +10,12 @@ import {
   type IncomeStatementData,
   type BalanceSheetData,
   type DashboardStats,
-  type AccountType,
+  accounts,
+  entries,
+  entryLines,
 } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Accounts
@@ -37,128 +40,103 @@ export interface IStorage {
   getDashboardStats(): Promise<DashboardStats>;
 }
 
-export class MemStorage implements IStorage {
-  private accounts: Map<string, Account>;
-  private entries: Map<string, Entry>;
-  private entryLines: Map<string, EntryLine>;
-
-  constructor() {
-    this.accounts = new Map();
-    this.entries = new Map();
-    this.entryLines = new Map();
-
-    // Initialize with sample accounts
-    this.initializeSampleData();
-  }
-
-  private async initializeSampleData() {
-    // Create sample accounts
-    const sampleAccounts: InsertAccount[] = [
-      { code: "1001", name: "النقدية بالصندوق", type: "أصول", isActive: 1 },
-      { code: "1002", name: "البنك", type: "أصول", isActive: 1 },
-      { code: "2001", name: "حسابات دائنة", type: "خصوم", isActive: 1 },
-      { code: "3001", name: "رأس المال", type: "حقوق ملكية", isActive: 1 },
-      { code: "4001", name: "إيرادات المبيعات", type: "إيرادات", isActive: 1 },
-      { code: "5001", name: "مصروفات الرواتب", type: "مصروفات", isActive: 1 },
-      { code: "5002", name: "مصروفات الإيجار", type: "مصروفات", isActive: 1 },
-    ];
-
-    for (const account of sampleAccounts) {
-      await this.createAccount(account);
-    }
-  }
-
+export class DatabaseStorage implements IStorage {
   // Accounts
   async getAccounts(): Promise<Account[]> {
-    return Array.from(this.accounts.values());
+    return await db.select().from(accounts);
   }
 
   async getAccount(id: string): Promise<Account | undefined> {
-    return this.accounts.get(id);
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
+    return account || undefined;
   }
 
   async getAccountByCode(code: string): Promise<Account | undefined> {
-    return Array.from(this.accounts.values()).find((acc) => acc.code === code);
+    const [account] = await db.select().from(accounts).where(eq(accounts.code, code));
+    return account || undefined;
   }
 
   async createAccount(insertAccount: InsertAccount): Promise<Account> {
-    const id = randomUUID();
-    const account: Account = {
-      ...insertAccount,
-      id,
-      balance: "0",
-      createdAt: new Date(),
-    };
-    this.accounts.set(id, account);
+    const [account] = await db
+      .insert(accounts)
+      .values({
+        ...insertAccount,
+        balance: "0",
+      })
+      .returning();
     return account;
   }
 
   async updateAccount(id: string, data: Partial<InsertAccount>): Promise<Account | undefined> {
-    const account = this.accounts.get(id);
-    if (!account) return undefined;
-
-    const updated: Account = { ...account, ...data };
-    this.accounts.set(id, updated);
-    return updated;
+    const [account] = await db
+      .update(accounts)
+      .set(data)
+      .where(eq(accounts.id, id))
+      .returning();
+    return account || undefined;
   }
 
   async deleteAccount(id: string): Promise<boolean> {
-    return this.accounts.delete(id);
+    const result = await db.delete(accounts).where(eq(accounts.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   async updateAccountBalance(id: string, amount: number): Promise<void> {
-    const account = this.accounts.get(id);
+    const account = await this.getAccount(id);
     if (account) {
       const currentBalance = Number(account.balance) || 0;
-      account.balance = (currentBalance + amount).toFixed(2);
-      this.accounts.set(id, account);
+      const newBalance = (currentBalance + amount).toFixed(2);
+      await db
+        .update(accounts)
+        .set({ balance: newBalance })
+        .where(eq(accounts.id, id));
     }
   }
 
   // Entries
   async getEntries(): Promise<FullEntry[]> {
-    const entries = Array.from(this.entries.values());
+    const allEntries = await db.select().from(entries).orderBy(desc(entries.createdAt));
     const fullEntries: FullEntry[] = [];
 
-    for (const entry of entries) {
-      const lines = Array.from(this.entryLines.values())
-        .filter((line) => line.entryId === entry.id)
-        .map((line) => {
-          const account = this.accounts.get(line.accountId);
+    for (const entry of allEntries) {
+      const lines = await db.select().from(entryLines).where(eq(entryLines.entryId, entry.id));
+      
+      const linesWithNames = await Promise.all(
+        lines.map(async (line) => {
+          const account = await this.getAccount(line.accountId);
           return {
             ...line,
             accountName: account ? `${account.code} - ${account.name}` : line.accountId,
           };
-        });
+        })
+      );
 
-      fullEntries.push({ ...entry, lines });
+      fullEntries.push({ ...entry, lines: linesWithNames });
     }
 
-    return fullEntries.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    return fullEntries;
   }
 
   async getEntry(id: string): Promise<FullEntry | undefined> {
-    const entry = this.entries.get(id);
+    const [entry] = await db.select().from(entries).where(eq(entries.id, id));
     if (!entry) return undefined;
 
-    const lines = Array.from(this.entryLines.values())
-      .filter((line) => line.entryId === entry.id)
-      .map((line) => {
-        const account = this.accounts.get(line.accountId);
+    const lines = await db.select().from(entryLines).where(eq(entryLines.entryId, entry.id));
+    
+    const linesWithNames = await Promise.all(
+      lines.map(async (line) => {
+        const account = await this.getAccount(line.accountId);
         return {
           ...line,
           accountName: account ? `${account.code} - ${account.name}` : line.accountId,
         };
-      });
+      })
+    );
 
-    return { ...entry, lines };
+    return { ...entry, lines: linesWithNames };
   }
 
   async createEntry(insertEntry: InsertEntry, insertLines: InsertEntryLine[]): Promise<FullEntry> {
-    const entryId = randomUUID();
-
     // Calculate totals
     let totalDebit = 0;
     let totalCredit = 0;
@@ -170,35 +148,33 @@ export class MemStorage implements IStorage {
 
     const isBalanced = totalDebit === totalCredit && totalDebit > 0 ? 1 : 0;
 
-    const entry: Entry = {
-      ...insertEntry,
-      id: entryId,
-      date: new Date(insertEntry.date),
-      totalDebit: totalDebit.toFixed(2),
-      totalCredit: totalCredit.toFixed(2),
-      isBalanced,
-      createdAt: new Date(),
-    };
-
-    this.entries.set(entryId, entry);
+    // Create entry
+    const [entry] = await db
+      .insert(entries)
+      .values({
+        ...insertEntry,
+        date: new Date(insertEntry.date),
+        totalDebit: totalDebit.toFixed(2),
+        totalCredit: totalCredit.toFixed(2),
+        isBalanced,
+      })
+      .returning();
 
     // Create entry lines and update account balances
-    const lines: (EntryLine & { accountName?: string })[] = [];
+    const linesWithNames = [];
     for (const insertLine of insertLines) {
-      const lineId = randomUUID();
-      const line: EntryLine = {
-        ...insertLine,
-        id: lineId,
-        entryId,
-        debit: (Number(insertLine.debit) || 0).toFixed(2),
-        credit: (Number(insertLine.credit) || 0).toFixed(2),
-        createdAt: new Date(),
-      };
-
-      this.entryLines.set(lineId, line);
+      const [line] = await db
+        .insert(entryLines)
+        .values({
+          ...insertLine,
+          entryId: entry.id,
+          debit: (Number(insertLine.debit) || 0).toFixed(2),
+          credit: (Number(insertLine.credit) || 0).toFixed(2),
+        })
+        .returning();
 
       // Update account balance
-      const account = this.accounts.get(line.accountId);
+      const account = await this.getAccount(line.accountId);
       if (account) {
         const debitAmount = Number(line.debit) || 0;
         const creditAmount = Number(line.credit) || 0;
@@ -214,29 +190,25 @@ export class MemStorage implements IStorage {
 
         await this.updateAccountBalance(line.accountId, balanceChange);
         
-        lines.push({
+        linesWithNames.push({
           ...line,
           accountName: `${account.code} - ${account.name}`,
         });
       } else {
-        lines.push(line);
+        linesWithNames.push(line);
       }
     }
 
-    return { ...entry, lines };
+    return { ...entry, lines: linesWithNames };
   }
 
   async deleteEntry(id: string): Promise<boolean> {
-    const entry = this.entries.get(id);
+    const entry = await this.getEntry(id);
     if (!entry) return false;
 
-    // Delete entry lines and reverse account balances
-    const lines = Array.from(this.entryLines.values()).filter(
-      (line) => line.entryId === id
-    );
-
-    for (const line of lines) {
-      const account = this.accounts.get(line.accountId);
+    // Reverse account balances
+    for (const line of entry.lines) {
+      const account = await this.getAccount(line.accountId);
       if (account) {
         const debitAmount = Number(line.debit) || 0;
         const creditAmount = Number(line.credit) || 0;
@@ -251,19 +223,22 @@ export class MemStorage implements IStorage {
 
         await this.updateAccountBalance(line.accountId, balanceChange);
       }
-
-      this.entryLines.delete(line.id);
     }
 
-    return this.entries.delete(id);
+    // Delete entry lines
+    await db.delete(entryLines).where(eq(entryLines.entryId, id));
+    
+    // Delete entry
+    const result = await db.delete(entries).where(eq(entries.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   // Reports
   async getTrialBalance(): Promise<TrialBalanceRow[]> {
-    const accounts = Array.from(this.accounts.values());
+    const allAccounts = await db.select().from(accounts);
     const rows: TrialBalanceRow[] = [];
 
-    for (const account of accounts) {
+    for (const account of allAccounts) {
       const balance = Number(account.balance) || 0;
       const debit = balance > 0 ? balance.toFixed(2) : "0.00";
       const credit = balance < 0 ? Math.abs(balance).toFixed(2) : "0.00";
@@ -283,16 +258,16 @@ export class MemStorage implements IStorage {
   }
 
   async getIncomeStatement(from: Date, to: Date): Promise<IncomeStatementData> {
-    const accounts = Array.from(this.accounts.values());
+    const allAccounts = await db.select().from(accounts);
     
-    const revenues = accounts
+    const revenues = allAccounts
       .filter((acc) => acc.type === "إيرادات")
       .map((acc) => ({
         accountName: acc.name,
         amount: acc.balance,
       }));
 
-    const expenses = accounts
+    const expenses = allAccounts
       .filter((acc) => acc.type === "مصروفات")
       .map((acc) => ({
         accountName: acc.name,
@@ -325,23 +300,23 @@ export class MemStorage implements IStorage {
   }
 
   async getBalanceSheet(date: Date): Promise<BalanceSheetData> {
-    const accounts = Array.from(this.accounts.values());
+    const allAccounts = await db.select().from(accounts);
 
-    const assets = accounts
+    const assets = allAccounts
       .filter((acc) => acc.type === "أصول")
       .map((acc) => ({
         accountName: acc.name,
         amount: acc.balance,
       }));
 
-    const liabilities = accounts
+    const liabilities = allAccounts
       .filter((acc) => acc.type === "خصوم")
       .map((acc) => ({
         accountName: acc.name,
         amount: Math.abs(Number(acc.balance)).toFixed(2),
       }));
 
-    const equity = accounts
+    const equity = allAccounts
       .filter((acc) => acc.type === "حقوق ملكية")
       .map((acc) => ({
         accountName: acc.name,
@@ -375,18 +350,18 @@ export class MemStorage implements IStorage {
   }
 
   async getDashboardStats(): Promise<DashboardStats> {
-    const accounts = Array.from(this.accounts.values());
-    const entries = await this.getEntries();
+    const allAccounts = await db.select().from(accounts);
+    const allEntries = await this.getEntries();
 
-    const totalRevenues = accounts
+    const totalRevenues = allAccounts
       .filter((acc) => acc.type === "إيرادات")
       .reduce((sum, acc) => sum + Math.abs(Number(acc.balance)), 0);
 
-    const totalExpenses = accounts
+    const totalExpenses = allAccounts
       .filter((acc) => acc.type === "مصروفات")
       .reduce((sum, acc) => sum + Number(acc.balance), 0);
 
-    const totalBalance = accounts.reduce(
+    const totalBalance = allAccounts.reduce(
       (sum, acc) => sum + Number(acc.balance),
       0
     );
@@ -394,7 +369,7 @@ export class MemStorage implements IStorage {
     const netIncome = totalRevenues - totalExpenses;
 
     // Get recent entries (last 10)
-    const recentEntries = entries.slice(0, 10);
+    const recentEntries = allEntries.slice(0, 10);
 
     // Generate monthly data for the chart (last 6 months)
     const monthlyData = [];
@@ -422,4 +397,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

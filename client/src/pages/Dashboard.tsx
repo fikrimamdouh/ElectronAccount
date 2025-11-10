@@ -58,7 +58,7 @@ export default function Dashboard() {
         </div>
         <Link href="/entries">
           <Button size="lg" data-testid="button-new-entry">
-            <PlusCircle className="w-5 h-5 ml-2" />
+            <PlusCircle className="w-5 h-5 me-2" />
             قيد جديد
           </Button>
         </Link>
@@ -133,7 +133,7 @@ export default function Dashboard() {
           <Link href="/entries">
             <Button variant="ghost" size="sm" data-testid="button-view-all">
               عرض الكل
-              <ArrowRight className="w-4 h-4 mr-2" />
+              <ArrowRight className="w-4 h-4 ms-2" />
             </Button>
           </Link>
         </div>
@@ -153,7 +153,7 @@ export default function Dashboard() {
                     {entry.description}
                   </p>
                 </div>
-                <div className="text-left">
+                <div className="text-start">
                   <p className="font-mono font-medium" data-testid="text-entry-amount">
                     {entry.totalDebit} ريال
                   </p>

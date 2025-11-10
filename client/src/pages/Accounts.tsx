@@ -101,7 +101,7 @@ export default function Accounts() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button size="lg" data-testid="button-new-account">
-              <PlusCircle className="w-5 h-5 ml-2" />
+              <PlusCircle className="w-5 h-5 me-2" />
               حساب جديد
             </Button>
           </DialogTrigger>
@@ -206,7 +206,7 @@ export default function Accounts() {
             placeholder="البحث عن حساب..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pr-10"
+            className="pe-10"
             data-testid="input-search-accounts"
           />
         </div>

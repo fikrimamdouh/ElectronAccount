@@ -54,12 +54,12 @@ export default function Settings() {
           >
             {theme === "light" ? (
               <>
-                <Moon className="w-5 h-5 ml-2" />
+                <Moon className="w-5 h-5 me-2" />
                 تفعيل الوضع الليلي
               </>
             ) : (
               <>
-                <Sun className="w-5 h-5 ml-2" />
+                <Sun className="w-5 h-5 me-2" />
                 تفعيل الوضع النهاري
               </>
             )}
