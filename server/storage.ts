@@ -10,9 +10,15 @@ import {
   type IncomeStatementData,
   type BalanceSheetData,
   type DashboardStats,
+  type Product,
+  type InsertProduct,
+  type Customer,
+  type InsertCustomer,
   accounts,
   entries,
   entryLines,
+  products,
+  customers,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -32,6 +38,23 @@ export interface IStorage {
   getEntry(id: string): Promise<FullEntry | undefined>;
   createEntry(entry: InsertEntry, lines: InsertEntryLine[]): Promise<FullEntry>;
   deleteEntry(id: string): Promise<boolean>;
+
+  // Products
+  getProducts(): Promise<Product[]>;
+  getProduct(id: string): Promise<Product | undefined>;
+  getProductByCode(itemCode: string): Promise<Product | undefined>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<boolean>;
+
+  // Customers
+  getCustomers(): Promise<Customer[]>;
+  getCustomer(id: string): Promise<Customer | undefined>;
+  getCustomerByCode(code: string): Promise<Customer | undefined>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string): Promise<boolean>;
+  updateCustomerBalance(id: string, amount: number): Promise<void>;
 
   // Reports
   getTrialBalance(): Promise<TrialBalanceRow[]>;
@@ -347,6 +370,167 @@ export class DatabaseStorage implements IStorage {
       totalEquity: totalEquity.toFixed(2),
       date: date.toISOString(),
     };
+  }
+
+  // Products
+  async getProducts(): Promise<Product[]> {
+    return await db.select().from(products);
+  }
+
+  async getProduct(id: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product || undefined;
+  }
+
+  async getProductByCode(itemCode: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.itemCode, itemCode));
+    return product || undefined;
+  }
+
+  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+    const [product] = await db
+      .insert(products)
+      .values({
+        ...insertProduct,
+        salePrice: insertProduct.salePrice.toString(),
+        costPrice: insertProduct.costPrice.toString(),
+      })
+      .returning();
+    return product;
+  }
+
+  async updateProduct(id: string, data: Partial<InsertProduct>): Promise<Product | undefined> {
+    const updateData: any = { ...data };
+    if (data.salePrice !== undefined) {
+      updateData.salePrice = data.salePrice.toString();
+    }
+    if (data.costPrice !== undefined) {
+      updateData.costPrice = data.costPrice.toString();
+    }
+    
+    const [product] = await db
+      .update(products)
+      .set(updateData)
+      .where(eq(products.id, id))
+      .returning();
+    return product || undefined;
+  }
+
+  async deleteProduct(id: string): Promise<boolean> {
+    const result = await db.delete(products).where(eq(products.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Customers
+  async getCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers);
+  }
+
+  async getCustomer(id: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer || undefined;
+  }
+
+  async getCustomerByCode(code: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.code, code));
+    return customer || undefined;
+  }
+
+  async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
+    // Use transaction to ensure both customer and account are created atomically
+    return await db.transaction(async (tx) => {
+      // Create customer account in chart of accounts if not provided
+      let accountId = insertCustomer.accountId;
+      
+      if (!accountId) {
+        const [customerAccount] = await tx
+          .insert(accounts)
+          .values({
+            code: `1120-${insertCustomer.code}`,
+            name: `عميل: ${insertCustomer.name}`,
+            type: "أصول",
+            parentId: null,
+            balance: insertCustomer.openingBalance.toString(),
+            isActive: 1,
+          })
+          .returning();
+        accountId = customerAccount.id;
+      }
+
+      const [customer] = await tx
+        .insert(customers)
+        .values({
+          ...insertCustomer,
+          openingBalance: insertCustomer.openingBalance.toString(),
+          currentBalance: insertCustomer.openingBalance.toString(),
+          accountId,
+        })
+        .returning();
+
+      return customer;
+    });
+  }
+
+  async updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const updateData: any = { ...data };
+    if (data.openingBalance !== undefined) {
+      updateData.openingBalance = data.openingBalance.toString();
+    }
+    
+    const [customer] = await db
+      .update(customers)
+      .set(updateData)
+      .where(eq(customers.id, id))
+      .returning();
+    return customer || undefined;
+  }
+
+  async deleteCustomer(id: string): Promise<boolean> {
+    // Use transaction to delete customer and their account
+    return await db.transaction(async (tx) => {
+      // Get customer first to check if they have linked account
+      const [customer] = await tx.select().from(customers).where(eq(customers.id, id));
+      
+      if (!customer) {
+        return false;
+      }
+
+      // Check if linked account exists and validate balance before deletion
+      // Read account within transaction scope to ensure we have the current balance
+      if (customer.accountId) {
+        const [account] = await tx.select().from(accounts).where(eq(accounts.id, customer.accountId));
+        if (account) {
+          const balance = parseFloat(account.balance);
+          if (balance !== 0) {
+            // Abort transaction if account has non-zero balance
+            throw new Error(`لا يمكن حذف العميل. الرصيد الحالي للحساب المحاسبي: ${balance.toFixed(2)} ر.س. يجب أن يكون الرصيد صفر أولاً.`);
+          }
+          // Delete account if balance is zero
+          await tx.delete(accounts).where(eq(accounts.id, customer.accountId));
+        }
+      }
+
+      // Delete customer after validating account balance
+      await tx.delete(customers).where(eq(customers.id, id));
+
+      return true;
+    });
+  }
+
+  async updateCustomerBalance(id: string, amount: number): Promise<void> {
+    const customer = await this.getCustomer(id);
+    if (customer) {
+      const newBalance = parseFloat(customer.currentBalance) + amount;
+      await db
+        .update(customers)
+        .set({ currentBalance: newBalance.toString() })
+        .where(eq(customers.id, id));
+      
+      // Update linked account balance
+      if (customer.accountId) {
+        await this.updateAccountBalance(customer.accountId, amount);
+      }
+    }
   }
 
   async getDashboardStats(): Promise<DashboardStats> {

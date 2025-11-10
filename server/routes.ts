@@ -4,8 +4,12 @@ import { storage } from "./storage";
 import {
   insertAccountSchema,
   insertFullEntrySchema,
+  insertProductSchema,
+  insertCustomerSchema,
   type InsertAccount,
   type InsertFullEntry,
+  type InsertProduct,
+  type InsertCustomer,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -229,6 +233,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
       res.status(500).json({ error: "فشل في جلب الإحصائيات" });
+    }
+  });
+
+  // Products Routes
+  app.get("/api/products", async (_req, res) => {
+    try {
+      const products = await storage.getProducts();
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "فشل في جلب الأصناف" });
+    }
+  });
+
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: "الصنف غير موجود" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      res.status(500).json({ error: "فشل في جلب الصنف" });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const validatedData = insertProductSchema.parse(req.body);
+
+      // Check if product code already exists
+      const existing = await storage.getProductByCode(validatedData.itemCode);
+      if (existing) {
+        return res.status(400).json({ error: "كود الصنف موجود بالفعل" });
+      }
+
+      const product = await storage.createProduct(validatedData);
+      res.status(201).json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error creating product:", error);
+      res.status(500).json({ error: "فشل في إنشاء الصنف" });
+    }
+  });
+
+  app.put("/api/products/:id", async (req, res) => {
+    try {
+      const validatedData = insertProductSchema.partial().parse(req.body);
+      const product = await storage.updateProduct(req.params.id, validatedData);
+      
+      if (!product) {
+        return res.status(404).json({ error: "الصنف غير موجود" });
+      }
+      
+      res.json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error updating product:", error);
+      res.status(500).json({ error: "فشل في تحديث الصنف" });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteProduct(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الصنف غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ error: "فشل في حذف الصنف" });
+    }
+  });
+
+  // Customers Routes
+  app.get("/api/customers", async (_req, res) => {
+    try {
+      const customers = await storage.getCustomers();
+      res.json(customers);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ error: "فشل في جلب العملاء" });
+    }
+  });
+
+  app.get("/api/customers/:id", async (req, res) => {
+    try {
+      const customer = await storage.getCustomer(req.params.id);
+      if (!customer) {
+        return res.status(404).json({ error: "العميل غير موجود" });
+      }
+      res.json(customer);
+    } catch (error) {
+      console.error("Error fetching customer:", error);
+      res.status(500).json({ error: "فشل في جلب العميل" });
+    }
+  });
+
+  app.post("/api/customers", async (req, res) => {
+    try {
+      const validatedData = insertCustomerSchema.parse(req.body);
+
+      // Check if customer code already exists
+      const existing = await storage.getCustomerByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "كود العميل موجود بالفعل" });
+      }
+
+      const customer = await storage.createCustomer(validatedData);
+      res.status(201).json(customer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error creating customer:", error);
+      res.status(500).json({ error: "فشل في إنشاء العميل" });
+    }
+  });
+
+  app.put("/api/customers/:id", async (req, res) => {
+    try {
+      const validatedData = insertCustomerSchema.partial().parse(req.body);
+      const customer = await storage.updateCustomer(req.params.id, validatedData);
+      
+      if (!customer) {
+        return res.status(404).json({ error: "العميل غير موجود" });
+      }
+      
+      res.json(customer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      console.error("Error updating customer:", error);
+      res.status(500).json({ error: "فشل في تحديث العميل" });
+    }
+  });
+
+  app.delete("/api/customers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCustomer(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "العميل غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      res.status(500).json({ error: "فشل في حذف العميل" });
     }
   });
 
