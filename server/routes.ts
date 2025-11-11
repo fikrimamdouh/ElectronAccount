@@ -9,6 +9,7 @@ import {
   insertSupplierSchema,
   insertFullSalesInvoiceSchema,
   insertFullReceiptVoucherSchema,
+  insertFullPaymentVoucherSchema,
   type InsertAccount,
   type InsertFullEntry,
   type InsertProduct,
@@ -705,6 +706,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error posting receipt voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في نشر السند" 
+      });
+    }
+  });
+
+  // Payment Voucher routes
+  app.get("/api/payment-vouchers", async (_req, res) => {
+    try {
+      const vouchers = await storage.getPaymentVouchers();
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching payment vouchers:", error);
+      res.status(500).json({ error: "فشل في جلب سندات الدفع" });
+    }
+  });
+
+  app.get("/api/payment-vouchers/:id", async (req, res) => {
+    try {
+      const voucher = await storage.getPaymentVoucher(req.params.id);
+      if (!voucher) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json(voucher);
+    } catch (error) {
+      console.error("Error fetching payment voucher:", error);
+      res.status(500).json({ error: "فشل في جلب السند" });
+    }
+  });
+
+  app.post("/api/payment-vouchers", async (req, res) => {
+    try {
+      const validatedData = insertFullPaymentVoucherSchema.parse(req.body);
+
+      // Check if voucher number already exists
+      const allVouchers = await storage.getPaymentVouchers();
+      const existing = allVouchers.find(v => v.voucherNumber === validatedData.voucherNumber);
+      if (existing) {
+        return res.status(400).json({ error: "رقم السند موجود بالفعل" });
+      }
+
+      const voucher = await storage.createPaymentVoucherDraft(validatedData);
+      res.status(201).json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error creating payment voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في إنشاء السند" 
+      });
+    }
+  });
+
+  app.put("/api/payment-vouchers/:id", async (req, res) => {
+    try {
+      const validatedData = insertFullPaymentVoucherSchema.parse(req.body);
+      const voucher = await storage.updatePaymentVoucherDraft(req.params.id, validatedData);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "بيانات غير صحيحة",
+          details: error.errors 
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error updating payment voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في تحديث السند" 
+      });
+    }
+  });
+
+  app.delete("/api/payment-vouchers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePaymentVoucherDraft(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error deleting payment voucher:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "فشل في حذف السند" 
+      });
+    }
+  });
+
+  app.post("/api/payment-vouchers/:id/post", async (req, res) => {
+    try {
+      const voucher = await storage.postPaymentVoucher(req.params.id);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error posting payment voucher:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "فشل في نشر السند" 
       });
