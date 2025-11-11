@@ -111,11 +111,14 @@ The system is built as a monolithic ERP application with a modular design, featu
     - Suppliers management → `/master/suppliers`
     - Branches → `/master/branches`
     - Currencies → `/master/currencies`
+  - **المحاسبة المالية** (Financial Accounting) section:
+    - سندات الصرف under "القيود والحركات" → `/cash-bank/payment-vouchers` (unified with Cash & Bank section)
   - **النقدية والبنوك** (Cash & Bank) section:
     - Receipt Vouchers (سندات القبض) → `/cash-bank/receipt-vouchers`
-    - Payment Vouchers (سندات الدفع) → `/cash-bank/payment-vouchers`
+    - Payment Vouchers (سندات الصرف) → `/cash-bank/payment-vouchers`
     - Bank Accounts → `/cash-bank/bank-accounts`
     - Cash Boxes → `/cash-bank/cash-boxes`
+  - **Architecture Decision**: Both accounting and cash/bank sections route to same payment vouchers page since vouchers originate in cash/bank while automatically creating accounting entries
   
 - ✅ **UI/UX Improvements**:
   - Fixed sidebar layout using Shadcn's `SidebarInset` component to prevent content overlay

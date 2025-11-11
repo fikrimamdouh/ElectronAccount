@@ -164,7 +164,7 @@ const menuItems: MenuItem[] = [
           },
           {
             title: "سندات الصرف",
-            url: "/accounting/payments",
+            url: "/cash-bank/payment-vouchers",
             icon: DollarSign,
           },
         ],
@@ -390,7 +390,7 @@ const menuItems: MenuItem[] = [
       },
       {
         title: "سندات الصرف",
-        url: "/cash-bank/payments",
+        url: "/cash-bank/payment-vouchers",
         icon: CreditCard,
       },
       {
