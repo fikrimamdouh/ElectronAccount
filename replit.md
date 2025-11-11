@@ -77,6 +77,33 @@ The system is built as a monolithic ERP application with a modular design, featu
     - Toast notifications for all operations
     - 37+ data-testid attributes for E2E testing automation
   - **E2E Tested**: Full workflow verified (draft creation → posting → accounting → balance updates)
+
+- ✅ **Payment Vouchers (سندات الدفع)** - FULLY COMPLETED:
+  - **Database Schema**: `paymentVouchers`, `paymentVoucherAllocations` tables
+  - **Draft/Posted Workflow**: Vouchers start as drafts, can be edited/deleted, then posted permanently
+  - **Payment Methods**: Support for Cash (نقدي), Bank Transfer (بنك), and Check (شيك) with check details
+  - **Invoice Allocations**: Optional allocation to specific purchase invoices for better tracking
+  - **Accounting Integration** (Reverse of Receipt Vouchers):
+    - Debit: Supplier account (decreases liability - we owe them less)
+    - Credit: Bank/Cash account (decreases our assets - money out)
+    - Automatic supplier balance reduction
+    - All entries created atomically in single PostgreSQL transaction
+  - **Comprehensive Validations**:
+    - Amounts must be positive (> 0)
+    - Allocations cannot exceed voucher amount (partial allocations allowed)
+    - Allocated invoices must be posted and belong to same supplier
+    - Re-validation at posting time for data integrity
+  - **Transaction Safety**: All posting operations wrapped in atomic PostgreSQL transactions
+  - **Account Filtering**: Dynamic cash/bank account filtering based on payment method using `category` field
+  - **Full UI**: Complete interface with form dialog, data table, post/delete actions
+    - React Hook Form with Zod validation
+    - Dynamic account selection based on payment method (cash accounts for "نقدي", bank accounts for "بنك" or "شيك")
+    - Check details fields for "شيك" payment
+    - Loading/Error/Empty states with retry functionality
+    - Toast notifications for all operations
+    - Comprehensive data-testid attributes for E2E testing automation
+  - **E2E Tested**: Full workflow verified (draft creation → posting → accounting entry → supplier/cash balance updates → deletion protection)
+  - **Route**: `/cash-bank/payment-vouchers`
   
 - ✅ **Sidebar Navigation**: Organized navigation with clear module hierarchy
   - **البيانات الأساسية** (Master Data) section for shared data:
@@ -84,8 +111,9 @@ The system is built as a monolithic ERP application with a modular design, featu
     - Suppliers management → `/master/suppliers`
     - Branches → `/master/branches`
     - Currencies → `/master/currencies`
-  - **النقدية والبنوك** (Cash & Bank) section includes Receipt Vouchers:
+  - **النقدية والبنوك** (Cash & Bank) section:
     - Receipt Vouchers (سندات القبض) → `/cash-bank/receipt-vouchers`
+    - Payment Vouchers (سندات الدفع) → `/cash-bank/payment-vouchers`
     - Bank Accounts → `/cash-bank/bank-accounts`
     - Cash Boxes → `/cash-bank/cash-boxes`
   
