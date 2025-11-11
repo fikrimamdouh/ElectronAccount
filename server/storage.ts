@@ -22,6 +22,8 @@ import {
   type InvoiceStatus,
   type FullReceiptVoucher,
   type InsertFullReceiptVoucher,
+  type FullPaymentVoucher,
+  type InsertFullPaymentVoucher,
   accounts,
   entries,
   entryLines,
@@ -33,6 +35,8 @@ import {
   stockMovements,
   receiptVouchers,
   receiptVoucherAllocations,
+  paymentVouchers,
+  paymentVoucherAllocations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
@@ -105,6 +109,22 @@ export interface IStorage {
   deleteSalesInvoiceDraft(id: string): Promise<boolean>;
   postSalesInvoice(id: string): Promise<FullSalesInvoice>;
   computeSalesInvoiceTotals(items: Array<{productId: string; quantity: number; unitPrice: number}>): Promise<SalesInvoiceTotals>;
+
+  // Receipt Vouchers
+  createReceiptVoucherDraft(data: InsertFullReceiptVoucher): Promise<FullReceiptVoucher>;
+  getReceiptVouchers(): Promise<FullReceiptVoucher[]>;
+  getReceiptVoucher(id: string): Promise<FullReceiptVoucher | undefined>;
+  updateReceiptVoucherDraft(id: string, data: InsertFullReceiptVoucher): Promise<FullReceiptVoucher>;
+  deleteReceiptVoucherDraft(id: string): Promise<boolean>;
+  postReceiptVoucher(id: string): Promise<FullReceiptVoucher>;
+
+  // Payment Vouchers
+  createPaymentVoucherDraft(data: InsertFullPaymentVoucher): Promise<FullPaymentVoucher>;
+  getPaymentVouchers(): Promise<FullPaymentVoucher[]>;
+  getPaymentVoucher(id: string): Promise<FullPaymentVoucher | undefined>;
+  updatePaymentVoucherDraft(id: string, data: InsertFullPaymentVoucher): Promise<FullPaymentVoucher>;
+  deletePaymentVoucherDraft(id: string): Promise<boolean>;
+  postPaymentVoucher(id: string): Promise<FullPaymentVoucher>;
 
   // Reports
   getTrialBalance(): Promise<TrialBalanceRow[]>;
@@ -1370,9 +1390,9 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getReceiptVoucher(id: string): Promise<FullReceiptVoucher | null> {
+  async getReceiptVoucher(id: string): Promise<FullReceiptVoucher | undefined> {
     const [voucher] = await db.select().from(receiptVouchers).where(eq(receiptVouchers.id, id));
-    if (!voucher) return null;
+    if (!voucher) return undefined;
 
     const allocations = await db
       .select()
@@ -1735,6 +1755,351 @@ export class DatabaseStorage implements IStorage {
         allocations: allocationsWithInvoices,
         customerName: customer.name,
         targetAccountName: targetAccount.name,
+      };
+    });
+  }
+
+  // ===============================
+  // Payment Voucher Operations
+  // ===============================
+
+  async getPaymentVouchers(): Promise<FullPaymentVoucher[]> {
+    const vouchers = await db.select().from(paymentVouchers).orderBy(desc(paymentVouchers.createdAt));
+    
+    return await Promise.all(
+      vouchers.map(async (voucher) => {
+        const allocations = await db
+          .select()
+          .from(paymentVoucherAllocations)
+          .where(eq(paymentVoucherAllocations.voucherId, voucher.id));
+
+        const supplier = await this.getSupplier(voucher.supplierId);
+        const sourceAccount = await db
+          .select()
+          .from(accounts)
+          .where(eq(accounts.id, voucher.sourceAccountId))
+          .then(res => res[0]);
+
+        const allocationsWithInvoices = await Promise.all(
+          allocations.map(async (allocation) => {
+            return {
+              ...allocation,
+              invoiceNumber: allocation.purchaseInvoiceId,
+            };
+          })
+        );
+
+        return {
+          ...voucher,
+          allocations: allocationsWithInvoices,
+          supplierName: supplier?.name,
+          sourceAccountName: sourceAccount?.name,
+        };
+      })
+    );
+  }
+
+  async getPaymentVoucher(id: string): Promise<FullPaymentVoucher | undefined> {
+    const [voucher] = await db.select().from(paymentVouchers).where(eq(paymentVouchers.id, id));
+    if (!voucher) return undefined;
+
+    const allocations = await db
+      .select()
+      .from(paymentVoucherAllocations)
+      .where(eq(paymentVoucherAllocations.voucherId, id));
+
+    const supplier = await this.getSupplier(voucher.supplierId);
+    const sourceAccount = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, voucher.sourceAccountId))
+      .then(res => res[0]);
+
+    const allocationsWithInvoices = await Promise.all(
+      allocations.map(async (allocation) => {
+        return {
+          ...allocation,
+          invoiceNumber: allocation.purchaseInvoiceId,
+        };
+      })
+    );
+
+    return {
+      ...voucher,
+      allocations: allocationsWithInvoices,
+      supplierName: supplier?.name,
+      sourceAccountName: sourceAccount?.name,
+    };
+  }
+
+  async createPaymentVoucherDraft(data: InsertFullPaymentVoucher): Promise<FullPaymentVoucher> {
+    return await db.transaction(async (tx) => {
+      // Validate allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        // Check sum of allocations doesn't exceed voucher amount
+        const totalAllocations = data.allocations.reduce(
+          (sum, allocation) => sum + parseFloat(allocation.amount.toString()),
+          0
+        );
+        const voucherAmount = parseFloat(data.amount.toString());
+        
+        if (totalAllocations > voucherAmount) {
+          throw new ValidationError(`مجموع التخصيصات (${totalAllocations}) يتجاوز مبلغ السند (${voucherAmount})`);
+        }
+
+        // Validate each allocation
+        for (const allocation of data.allocations) {
+          // Check amount is positive
+          if (parseFloat(allocation.amount.toString()) <= 0) {
+            throw new ValidationError("مبلغ التخصيص يجب أن يكون أكبر من صفر");
+          }
+        }
+      }
+
+      // Create voucher
+      const [voucher] = await tx
+        .insert(paymentVouchers)
+        .values({
+          voucherNumber: data.voucherNumber,
+          voucherDate: new Date(data.voucherDate),
+          supplierId: data.supplierId,
+          amount: data.amount.toString(),
+          paymentMethod: data.paymentMethod,
+          sourceAccountId: data.sourceAccountId,
+          checkNumber: data.checkNumber,
+          checkDate: data.checkDate ? new Date(data.checkDate) : undefined,
+          checkBank: data.checkBank,
+          status: "مسودة",
+          notes: data.notes,
+        })
+        .returning();
+
+      // Create allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        await tx.insert(paymentVoucherAllocations).values(
+          data.allocations.map((allocation) => ({
+            voucherId: voucher.id,
+            purchaseInvoiceId: allocation.purchaseInvoiceId,
+            amount: allocation.amount.toString(),
+          }))
+        );
+      }
+
+      return await this.getPaymentVoucher(voucher.id) as FullPaymentVoucher;
+    });
+  }
+
+  async updatePaymentVoucherDraft(id: string, data: InsertFullPaymentVoucher): Promise<FullPaymentVoucher> {
+    return await db.transaction(async (tx) => {
+      // Get voucher
+      const [voucher] = await tx.select().from(paymentVouchers).where(eq(paymentVouchers.id, id));
+      
+      if (!voucher) {
+        throw new NotFoundError("السند غير موجود");
+      }
+
+      if (voucher.status !== "مسودة") {
+        throw new InvalidStateError("لا يمكن تعديل سند منشور");
+      }
+
+      // Validate allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        // Check sum of allocations doesn't exceed voucher amount
+        const totalAllocations = data.allocations.reduce(
+          (sum, allocation) => sum + parseFloat(allocation.amount.toString()),
+          0
+        );
+        const voucherAmount = parseFloat(data.amount.toString());
+        
+        if (totalAllocations > voucherAmount) {
+          throw new ValidationError(`مجموع التخصيصات (${totalAllocations}) يتجاوز مبلغ السند (${voucherAmount})`);
+        }
+
+        // Validate each allocation
+        for (const allocation of data.allocations) {
+          // Check amount is positive
+          if (parseFloat(allocation.amount.toString()) <= 0) {
+            throw new ValidationError("مبلغ التخصيص يجب أن يكون أكبر من صفر");
+          }
+        }
+      }
+
+      // Update voucher
+      await tx
+        .update(paymentVouchers)
+        .set({
+          voucherNumber: data.voucherNumber,
+          voucherDate: new Date(data.voucherDate),
+          supplierId: data.supplierId,
+          amount: data.amount.toString(),
+          paymentMethod: data.paymentMethod,
+          sourceAccountId: data.sourceAccountId,
+          checkNumber: data.checkNumber,
+          checkDate: data.checkDate ? new Date(data.checkDate) : undefined,
+          checkBank: data.checkBank,
+          notes: data.notes,
+        })
+        .where(eq(paymentVouchers.id, id));
+
+      // Delete old allocations
+      await tx.delete(paymentVoucherAllocations).where(eq(paymentVoucherAllocations.voucherId, id));
+
+      // Create new allocations if any
+      if (data.allocations && data.allocations.length > 0) {
+        await tx.insert(paymentVoucherAllocations).values(
+          data.allocations.map((allocation) => ({
+            voucherId: id,
+            purchaseInvoiceId: allocation.purchaseInvoiceId,
+            amount: allocation.amount.toString(),
+          }))
+        );
+      }
+
+      return await this.getPaymentVoucher(id) as FullPaymentVoucher;
+    });
+  }
+
+  async deletePaymentVoucherDraft(id: string): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      const [voucher] = await tx.select().from(paymentVouchers).where(eq(paymentVouchers.id, id));
+      
+      if (!voucher) {
+        return false;
+      }
+
+      if (voucher.status !== "مسودة") {
+        throw new InvalidStateError("لا يمكن حذف سند منشور");
+      }
+
+      // Delete allocations
+      await tx.delete(paymentVoucherAllocations).where(eq(paymentVoucherAllocations.voucherId, id));
+
+      // Delete voucher
+      await tx.delete(paymentVouchers).where(eq(paymentVouchers.id, id));
+
+      return true;
+    });
+  }
+
+  async postPaymentVoucher(id: string): Promise<FullPaymentVoucher> {
+    return await db.transaction(async (tx) => {
+      // Get voucher
+      const [voucher] = await tx.select().from(paymentVouchers).where(eq(paymentVouchers.id, id));
+
+      if (!voucher) {
+        throw new NotFoundError("السند غير موجود");
+      }
+
+      if (voucher.status === "منشور") {
+        throw new InvalidStateError("السند منشور مسبقاً");
+      }
+
+      // Get supplier
+      const [supplier] = await tx.select().from(suppliers).where(eq(suppliers.id, voucher.supplierId));
+
+      if (!supplier || !supplier.accountId) {
+        throw new NotFoundError("المورد غير موجود أو ليس له حساب محاسبي مرتبط");
+      }
+
+      // Get source account (bank or cash)
+      const [sourceAccount] = await tx.select().from(accounts).where(eq(accounts.id, voucher.sourceAccountId));
+
+      if (!sourceAccount) {
+        throw new NotFoundError("الحساب المصدر غير موجود");
+      }
+
+      // Re-validate allocations before posting
+      const allocations = await tx
+        .select()
+        .from(paymentVoucherAllocations)
+        .where(eq(paymentVoucherAllocations.voucherId, id));
+
+      if (allocations.length > 0) {
+        // Check sum of allocations
+        const totalAllocations = allocations.reduce(
+          (sum, allocation) => sum + parseFloat(allocation.amount),
+          0
+        );
+        const voucherAmount = parseFloat(voucher.amount);
+        
+        if (totalAllocations > voucherAmount) {
+          throw new ValidationError(`مجموع التخصيصات (${totalAllocations}) يتجاوز مبلغ السند (${voucherAmount})`);
+        }
+      }
+
+      // Create accounting entry
+      // Payment: Debit Supplier account, Credit Bank/Cash account
+      const [entry] = await tx
+        .insert(entries)
+        .values({
+          entryNumber: `PV-${voucher.voucherNumber}`,
+          date: voucher.voucherDate,
+          description: `سند دفع رقم ${voucher.voucherNumber} إلى ${supplier.name}`,
+          totalDebit: voucher.amount,
+          totalCredit: voucher.amount,
+          isBalanced: 1,
+        })
+        .returning();
+
+      // Entry line 1: Debit supplier account
+      await tx.insert(entryLines).values({
+        entryId: entry.id,
+        accountId: supplier.accountId,
+        debit: voucher.amount,
+        credit: "0",
+        description: `إلى المورد: ${supplier.name}`,
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric + ${voucher.amount}::numeric` })
+        .where(eq(accounts.id, supplier.accountId));
+
+      // Entry line 2: Credit source account (bank/cash)
+      await tx.insert(entryLines).values({
+        entryId: entry.id,
+        accountId: voucher.sourceAccountId,
+        debit: "0",
+        credit: voucher.amount,
+        description: `${sourceAccount.name} - ${voucher.paymentMethod}`,
+      });
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance}::numeric - ${voucher.amount}::numeric` })
+        .where(eq(accounts.id, voucher.sourceAccountId));
+
+      // Update supplier balance (decrease credit balance)
+      const newSupplierBalance = parseFloat(supplier.currentBalance) - parseFloat(voucher.amount);
+      await tx
+        .update(suppliers)
+        .set({ currentBalance: newSupplierBalance.toString() })
+        .where(eq(suppliers.id, voucher.supplierId));
+
+      // Update voucher status
+      const [postedVoucher] = await tx
+        .update(paymentVouchers)
+        .set({
+          status: "منشور",
+          entryId: entry.id,
+          postedAt: new Date(),
+        })
+        .where(eq(paymentVouchers.id, id))
+        .returning();
+
+      // Use allocations already fetched earlier for validation
+      const allocationsWithInvoices = await Promise.all(
+        allocations.map(async (allocation) => {
+          return {
+            ...allocation,
+            invoiceNumber: allocation.purchaseInvoiceId,
+          };
+        })
+      );
+
+      return {
+        ...postedVoucher,
+        allocations: allocationsWithInvoices,
+        supplierName: supplier.name,
+        sourceAccountName: sourceAccount.name,
       };
     });
   }

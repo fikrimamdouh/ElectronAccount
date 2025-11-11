@@ -521,3 +521,132 @@ export type FullReceiptVoucher = ReceiptVoucher & {
   customerName?: string;
   targetAccountName?: string;
 };
+
+// ==========================================
+// Payment Vouchers (سندات الدفع)
+// ==========================================
+
+// جدول سندات الدفع (للموردين)
+export const paymentVouchers = pgTable("payment_vouchers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  voucherNumber: varchar("voucher_number", { length: 50 }).notNull().unique(),
+  voucherDate: timestamp("voucher_date").notNull(),
+  supplierId: varchar("supplier_id").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull().$type<PaymentMethod>(),
+  sourceAccountId: varchar("source_account_id").notNull(), // حساب البنك أو الصندوق
+  checkNumber: varchar("check_number", { length: 50 }),
+  checkDate: timestamp("check_date"),
+  checkBank: varchar("check_bank", { length: 100 }),
+  status: text("status").notNull().default("مسودة"), // "مسودة" أو "منشور"
+  notes: text("notes"),
+  entryId: varchar("entry_id"), // القيد المحاسبي المرتبط (بعد النشر)
+  postedAt: timestamp("posted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// جدول تخصيصات سند الدفع (ربط السند بفواتير شراء معينة)
+export const paymentVoucherAllocations = pgTable("payment_voucher_allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  voucherId: varchar("voucher_id").notNull(),
+  purchaseInvoiceId: varchar("purchase_invoice_id").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Schema للإدراج - سندات الدفع
+export const insertPaymentVoucherSchema = createInsertSchema(paymentVouchers).omit({
+  id: true,
+  createdAt: true,
+  entryId: true,
+  postedAt: true,
+}).extend({
+  voucherNumber: z.string().min(1, "رقم السند مطلوب"),
+  voucherDate: z.string().or(z.date()),
+  supplierId: z.string().min(1, "المورد مطلوب"),
+  amount: z.string().or(z.number()).refine(
+    val => parseFloat(val.toString()) > 0, 
+    "المبلغ يجب أن يكون أكبر من صفر"
+  ),
+  paymentMethod: z.enum(["نقدي", "بنك", "شيك"], {
+    errorMap: () => ({ message: "طريقة الدفع غير صحيحة" }),
+  }),
+  sourceAccountId: z.string().min(1, "حساب الدفع مطلوب"),
+  checkNumber: z.string().optional(),
+  checkDate: z.string().or(z.date()).optional(),
+  checkBank: z.string().optional(),
+  status: z.enum(["مسودة", "منشور"]).default("مسودة"),
+  notes: z.string().optional(),
+});
+
+// Schema للإدراج - تخصيصات سند الدفع
+export const insertPaymentVoucherAllocationSchema = createInsertSchema(paymentVoucherAllocations).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherId: z.string().min(1),
+  purchaseInvoiceId: z.string().min(1, "فاتورة الشراء مطلوبة"),
+  amount: z.string().or(z.number()).refine(
+    val => parseFloat(val.toString()) > 0, 
+    "المبلغ يجب أن يكون أكبر من صفر"
+  ),
+});
+
+// Schema لسند الدفع الكامل مع التخصيصات
+export const insertFullPaymentVoucherSchema = z.object({
+  voucherNumber: z.string().min(1, "رقم السند مطلوب"),
+  voucherDate: z.string().or(z.date()),
+  supplierId: z.string().min(1, "المورد مطلوب"),
+  amount: z.string().or(z.number()).refine(
+    val => parseFloat(val.toString()) > 0, 
+    "المبلغ يجب أن يكون أكبر من صفر"
+  ),
+  paymentMethod: z.enum(["نقدي", "بنك", "شيك"], {
+    errorMap: () => ({ message: "طريقة الدفع غير صحيحة" }),
+  }),
+  sourceAccountId: z.string().min(1, "حساب الدفع مطلوب"),
+  checkNumber: z.string().optional(),
+  checkDate: z.string().or(z.date()).optional(),
+  checkBank: z.string().optional(),
+  notes: z.string().optional(),
+  allocations: z.array(
+    z.object({
+      purchaseInvoiceId: z.string().min(1, "فاتورة الشراء مطلوبة"),
+      amount: z.string().or(z.number()).refine(
+        val => parseFloat(val.toString()) > 0, 
+        "المبلغ يجب أن يكون أكبر من صفر"
+      ),
+    })
+  ).optional().default([]),
+}).refine(
+  (data) => {
+    // If allocations exist, their sum must not exceed the voucher amount
+    if (data.allocations && data.allocations.length > 0) {
+      const totalAllocations = data.allocations.reduce(
+        (sum, allocation) => sum + parseFloat(allocation.amount.toString()),
+        0
+      );
+      const voucherAmount = parseFloat(data.amount.toString());
+      return totalAllocations <= voucherAmount + 0.01; // Allow small tolerance
+    }
+    return true;
+  },
+  {
+    message: "مجموع التخصيصات لا يمكن أن يتجاوز مبلغ السند",
+    path: ["allocations"],
+  }
+);
+
+// أنواع TypeScript - سندات الدفع
+export type InsertPaymentVoucher = z.infer<typeof insertPaymentVoucherSchema>;
+export type PaymentVoucher = typeof paymentVouchers.$inferSelect;
+export type InsertPaymentVoucherAllocation = z.infer<typeof insertPaymentVoucherAllocationSchema>;
+export type PaymentVoucherAllocation = typeof paymentVoucherAllocations.$inferSelect;
+export type InsertFullPaymentVoucher = z.infer<typeof insertFullPaymentVoucherSchema>;
+
+// نوع لسند الدفع الكامل مع التفاصيل
+export type FullPaymentVoucher = PaymentVoucher & {
+  allocations: (PaymentVoucherAllocation & { invoiceNumber?: string })[];
+  supplierName?: string;
+  sourceAccountName?: string;
+};
