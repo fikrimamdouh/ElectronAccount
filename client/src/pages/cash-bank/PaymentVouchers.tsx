@@ -57,7 +57,7 @@ interface FullPaymentVoucher {
   voucherDate: string;
   supplierId: string;
   amount: string;
-  paymentMethod: "نقداً" | "تحويل بنكي" | "شيك";
+  paymentMethod: "نقدي" | "بنك" | "شيك";
   sourceAccountId: string;
   checkNumber?: string | null;
   checkDate?: string | null;
@@ -88,7 +88,7 @@ const voucherFormSchema = z.object({
   voucherDate: z.string().min(1, "تاريخ السند مطلوب"),
   supplierId: z.string().min(1, "المورد مطلوب"),
   amount: z.string().min(1, "المبلغ مطلوب").refine((val) => parseFloat(val) > 0, "المبلغ يجب أن يكون أكبر من صفر"),
-  paymentMethod: z.enum(["نقداً", "تحويل بنكي", "شيك"]),
+  paymentMethod: z.enum(["نقدي", "بنك", "شيك"]),
   sourceAccountId: z.string().min(1, "حساب الدفع مطلوب"),
   checkNumber: z.string().optional(),
   checkDate: z.string().optional(),
@@ -113,7 +113,7 @@ export default function PaymentVouchers() {
       voucherDate: new Date().toISOString().split("T")[0],
       supplierId: "",
       amount: "",
-      paymentMethod: "نقداً",
+      paymentMethod: "نقدي",
       sourceAccountId: "",
       checkNumber: "",
       checkDate: "",
@@ -225,7 +225,7 @@ export default function PaymentVouchers() {
       voucherDate: new Date().toISOString().split("T")[0],
       supplierId: "",
       amount: "",
-      paymentMethod: "نقداً",
+      paymentMethod: "نقدي",
       sourceAccountId: "",
       checkNumber: "",
       checkDate: "",
@@ -241,9 +241,9 @@ export default function PaymentVouchers() {
 
   const paymentMethod = form.watch("paymentMethod");
   const availableAccounts =
-    paymentMethod === "نقداً"
+    paymentMethod === "نقدي"
       ? cashAccounts
-      : paymentMethod === "تحويل بنكي" || paymentMethod === "شيك"
+      : paymentMethod === "بنك" || paymentMethod === "شيك"
         ? bankAccounts
         : [];
 
@@ -481,8 +481,8 @@ export default function PaymentVouchers() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="نقداً" data-testid="option-payment-cash">نقداً</SelectItem>
-                          <SelectItem value="تحويل بنكي" data-testid="option-payment-transfer">تحويل بنكي</SelectItem>
+                          <SelectItem value="نقدي" data-testid="option-payment-cash">نقداً</SelectItem>
+                          <SelectItem value="بنك" data-testid="option-payment-transfer">تحويل بنكي</SelectItem>
                           <SelectItem value="شيك" data-testid="option-payment-check">شيك</SelectItem>
                         </SelectContent>
                       </Select>
