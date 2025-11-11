@@ -6,12 +6,16 @@ import { z } from "zod";
 // أنواع الحسابات المحاسبية
 export type AccountType = "أصول" | "خصوم" | "إيرادات" | "مصروفات" | "حقوق ملكية";
 
+// تصنيفات الحسابات (للنقدية والبنوك وغيرها)
+export type AccountCategory = "نقدية" | "البنك" | "أخرى";
+
 // جدول الحسابات المالية
 export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   code: varchar("code", { length: 20 }).notNull().unique(),
   name: text("name").notNull(),
   type: text("type").notNull().$type<AccountType>(),
+  category: text("category").$type<AccountCategory>().default("أخرى"),
   parentId: varchar("parent_id"),
   balance: decimal("balance", { precision: 15, scale: 2 }).notNull().default("0"),
   isActive: integer("is_active").notNull().default(1),
@@ -52,6 +56,7 @@ export const insertAccountSchema = createInsertSchema(accounts).omit({
   type: z.enum(["أصول", "خصوم", "إيرادات", "مصروفات", "حقوق ملكية"], {
     errorMap: () => ({ message: "نوع الحساب غير صحيح" }),
   }),
+  category: z.enum(["نقدية", "البنك", "أخرى"]).default("أخرى"),
   parentId: z.string().optional(),
   isActive: z.number().default(1),
 });

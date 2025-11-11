@@ -71,6 +71,7 @@ import SupplierBalances from "@/pages/purchasing/reports/SupplierBalances";
 import BankAccounts from "@/pages/cash-bank/BankAccounts";
 import CashBoxes from "@/pages/cash-bank/CashBoxes";
 import ReceiptVouchers from "@/pages/cash-bank/ReceiptVouchers";
+import PaymentVouchers from "@/pages/cash-bank/PaymentVouchers";
 import CashBankPayments from "@/pages/cash-bank/Payments";
 import BankReconciliation from "@/pages/cash-bank/Reconciliation";
 
@@ -272,6 +273,7 @@ function Router() {
       <Route path="/cash-bank/bank-accounts" component={BankAccounts} />
       <Route path="/cash-bank/cash-boxes" component={CashBoxes} />
       <Route path="/cash-bank/receipt-vouchers" component={ReceiptVouchers} />
+      <Route path="/cash-bank/payment-vouchers" component={PaymentVouchers} />
       <Route path="/cash-bank/payments" component={CashBankPayments} />
       <Route path="/cash-bank/reconciliation" component={BankReconciliation} />
 
