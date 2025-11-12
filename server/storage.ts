@@ -49,6 +49,13 @@ export interface SalesInvoiceFilters {
   from?: Date;
   to?: Date;
 }
+export interface IStorage {
+  // Accounts
+  getAccounts(): Promise<Account[]>;
+  getCashAccounts(): Promise<Account[]>; // <--- أضف هذا السطر هنا
+  getAccount(id: string): Promise<Account | undefined>;
+  // ... (بقية الواجهة)
+}
 
 // Computed totals result
 export interface SalesInvoiceTotals {
@@ -2103,6 +2110,20 @@ export class DatabaseStorage implements IStorage {
       };
     });
   }
+}
+async getCashAccounts(): Promise {
+  const result = await db
+    .select()
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.type, "أصول"),
+        eq(accounts.category, "نقدية")
+      )
+    )
+    .orderBy(accounts.code);
+  
+  return result;
 }
 
 export const storage = new DatabaseStorage();

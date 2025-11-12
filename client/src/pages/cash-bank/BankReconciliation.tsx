@@ -1,19 +1,33 @@
-import { ArrowLeftRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeftRight, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+
+// سنقوم بتعريف هذا النوع لاحقاً في shared/schema.ts
+type ReconciliationData = {
+  description: string;
+  amount: number;
+  type: "bank" | "book" | "adjustment" | "adjusted";
+};
 
 export default function BankReconciliation() {
-  // Sample mock data for demonstration (replace with real data from API or props)
-  const data = [
-    { description: "رصيد الحساب البنكي حسب البيان البنكي", amount: 150000, type: "bank" },
-    { description: "إضافة: الإيداعات تحت التحصيل", amount: 10000, type: "adjustment" },
-    { description: "خصم: الشيكات المستحقة غير المقدمة", amount: -5000, type: "adjustment" },
-    { description: "رصيد الحساب البنكي المعدل", amount: 155000, type: "adjusted" },
-    { description: "رصيد الحساب حسب الدفاتر", amount: 160000, type: "book" },
-    { description: "خصم: رسوم بنكية غير مسجلة", amount: -3000, type: "adjustment" },
-    { description: "إضافة: فوائد بنكية غير مسجلة", amount: 2000, type: "adjustment" },
-    { description: "رصيد الحساب حسب الدفاتر المعدل", amount: 159000, type: "adjusted" },
-  ];
+  // الخطوة 1: الاستعداد لجلب البيانات الحقيقية من الخادم
+  const {
+    data: reconciliationData = [], // اسم المتغير الآن reconciliationData
+    isLoading,
+    isError,
+    error,
+  } = useQuery<ReconciliationData[]>({
+    // هذا هو عنوان API الذي سنقوم بإنشائه لاحقاً
+    // queryKey يعتمد على معرف التسوية، لذا سنعطله الآن
+    queryKey: ["/api/reconciliations", "some-reconciliation-id"], 
+    enabled: false, // تعطيل الجلب التلقائي حالياً لأن الواجهة الخلفية غير جاهزة
+  });
 
-  // Note: In a real scenario, ensure adjusted balances match for reconciliation
+  // استخدام البيانات الوهمية مؤقتاً طالما لا توجد بيانات حقيقية
+  const displayData = isLoading || reconciliationData.length === 0 ? [
+    { description: "رصيد الحساب البنكي حسب البيان البنكي", amount: 0, type: "bank" },
+    { description: "رصيد الحساب حسب الدفاتر", amount: 0, type: "book" },
+  ] : reconciliationData;
 
   return (
     <div className="space-y-6">
@@ -23,7 +37,7 @@ export default function BankReconciliation() {
           التسويات البنكية
         </h1>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -31,26 +45,49 @@ export default function BankReconciliation() {
                 الوصف
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                المبلغ (ريال)
+                المبلغ
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((item, index) => {
-              const amountColor = item.amount >= 0 ? "text-green-600" : "text-red-600";
-              return (
-                <tr key={index}>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                    {item.description}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${item.type === "adjustment" ? amountColor : "text-gray-500"}`}>
-                    {item.amount.toLocaleString()}
-                  </td>
-                </tr>
-              );
-            })}
+            {/* الخطوة 2: عرض حالات التحميل والخطأ والبيانات */}
+            {isLoading && (
+              <tr>
+                <td colSpan={2} className="text-center py-10">
+                  <div className="flex justify-center items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>جاري تحميل بيانات التسوية...</span>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {isError && (
+              <tr>
+                <td colSpan={2} className="text-center py-10 text-destructive">
+                  حدث خطأ أثناء جلب البيانات: {error.message}
+                </td>
+              </tr>
+            )}
+            {!isLoading &&
+              displayData.map((item, index) => {
+                const amountColor = item.amount >= 0 ? "text-green-600" : "text-red-600";
+                const isBold = item.type === "adjusted" || item.type === "bank" || item.type === "book";
+                return (
+                  <tr key={index} className={isBold ? "bg-gray-50" : ""}>
+                    <td className={`px-6 py-4 whitespace-nowrap text-right text-sm ${isBold ? "font-bold text-gray-800" : "text-gray-600"}`}>
+                      {item.description}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-right text-sm font-mono ${isBold ? "font-bold" : ""} ${item.type === "adjustment" ? amountColor : "text-gray-800"}`}>
+                      {item.amount.toLocaleString("ar-SA", { style: "currency", currency: "SAR" })}
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
+      </div>
+      <div className="text-center text-muted-foreground p-4 border rounded-lg">
+        ميزة التسويات البنكية قيد التطوير. الواجهة جاهزة للتكامل مع الواجهة الخلفية (API).
       </div>
     </div>
   );

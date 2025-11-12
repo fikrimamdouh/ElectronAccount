@@ -1,16 +1,22 @@
-import { Wallet } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2, Wallet } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import type { Account } from "@shared/schema";
 
 export default function CashBoxes() {
-  // Sample mock data for demonstration (replace with real data from API or props)
-  const data = [
-    { name: "الصندوق الرئيسي", location: "الفرع الرئيسي", balance: 50000, currency: "ريال" },
-    { name: "صندوق المبيعات", location: "قسم المبيعات", balance: 20000, currency: "ريال" },
-    { name: "صندوق الاحتياطي", location: "المكتب الإداري", balance: 10000, currency: "ريال" },
-    { name: "صندوق الفروع", location: "فرع الشمال", balance: 15000, currency: "ريال" },
-  ];
+  // الخطوة 1: جلب البيانات الحقيقية من الخادم باستخدام useQuery
+  const {
+    data: cashAccounts = [], // اسم المتغير الآن cashAccounts
+    isLoading,
+    isError,
+    error,
+  } = useQuery<Account[]>({
+    // هذا هو عنوان API الجديد الذي سنقوم بإنشائه في الخادم
+    queryKey: ["/api/accounts/cash-boxes"], 
+  });
 
-  // Calculate total balance
-  const totalBalance = data.reduce((sum, item) => sum + item.balance, 0);
+  // الخطوة 2: حساب الرصيد الإجمالي من البيانات الحقيقية
+  const totalBalance = cashAccounts.reduce((sum, account) => sum + parseFloat(account.balance), 0);
 
   return (
     <div className="space-y-6">
@@ -20,53 +26,77 @@ export default function CashBoxes() {
           الصناديق
         </h1>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                الاسم
+                رمز الحساب
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                الموقع
+                اسم الصندوق
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                الرصيد (ريال)
+                الرصيد
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                العملة
+                الحالة
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((item, index) => (
-              <tr key={index}>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                  {item.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {item.location}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {item.balance.toLocaleString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                  {item.currency}
+            {/* الخطوة 3: عرض حالات التحميل والخطأ والبيانات */}
+            {isLoading && (
+              <tr>
+                <td colSpan={4} className="text-center py-10">
+                  <div className="flex justify-center items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>جاري تحميل بيانات الصناديق...</span>
+                  </div>
                 </td>
               </tr>
-            ))}
+            )}
+            {isError && (
+              <tr>
+                <td colSpan={4} className="text-center py-10 text-destructive">
+                  حدث خطأ أثناء جلب البيانات: {error.message}
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && cashAccounts.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center py-10 text-muted-foreground">
+                  لم يتم العثور على حسابات صناديق. (تأكد من تعريف حسابات من نوع "أصول" وتصنيف "نقدية")
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError &&
+              cashAccounts.map((account) => (
+                <tr key={account.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-500">
+                    {account.code}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                    {account.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-mono text-gray-700">
+                    {parseFloat(account.balance).toLocaleString("ar-SA", { style: "currency", currency: "SAR" })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                    {account.isActive ? "نشط" : "موقوف"}
+                  </td>
+                </tr>
+              ))}
           </tbody>
-          <tfoot className="bg-gray-50">
+          <tfoot className="bg-gray-100 font-bold">
             <tr>
-              <td className="px-6 py-3 text-right text-sm font-medium text-gray-900" colSpan={2}>
+              <td className="px-6 py-4 text-right text-sm text-gray-900" colSpan={2}>
                 الإجمالي
               </td>
-              <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
-                {totalBalance.toLocaleString()}
+              <td className="px-6 py-4 text-right text-sm font-mono text-gray-900">
+                {totalBalance.toLocaleString("ar-SA", { style: "currency", currency: "SAR" })}
               </td>
-              <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
-                ريال
-              </td>
+              <td className="px-6 py-4"></td>
             </tr>
           </tfoot>
         </table>
