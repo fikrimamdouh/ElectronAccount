@@ -240,6 +240,30 @@ export default function Entries() {
                       <FormMessage />
                     </FormItem>
                   )}
+                      render={({ field }) => {
+                    const { value, onChange, ...rest } = field;
+                    const normalizedValue = value
+                      ? value instanceof Date
+                        ? value.toISOString().split("T")[0]
+                        : value
+                      : "";
+
+                    return (
+                      <FormItem>
+                        <FormLabel>التاريخ</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...rest}
+                            value={normalizedValue}
+                            onChange={(event) => onChange(event.target.value)}
+                            data-testid="input-entry-date"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 
