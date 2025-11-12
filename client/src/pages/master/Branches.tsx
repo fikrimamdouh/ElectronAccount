@@ -1,610 +1,939 @@
- (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/client/src/pages/master/BranchesPage.tsx b/client/src/pages/master/BranchesPage.tsx
-new file mode 100644
-index 0000000000000000000000000000000000000000..35d946a153507580bb84d91d31b19dca283f3b92
---- /dev/null
-+++ b/client/src/pages/master/BranchesPage.tsx
-@@ -0,0 +1,600 @@
-+import { useEffect, useMemo, useState } from "react";
-+import { useMutation, useQuery } from "@tanstack/react-query";
-+import { useForm, type UseFormReturn } from "react-hook-form";
-+import { zodResolver } from "@hookform/resolvers/zod";
-+import {
-+  insertBranchSchema,
-+  type Branch,
-+  type InsertBranch,
-+} from "@shared/schema";
-+import {
-+  Building2,
-+  Loader2,
-+  Mail,
-+  MapPin,
-+  Phone,
-+  Plus,
-+  RotateCcw,
-+  Save,
-+  Trash2,
-+  User,
-+} from "lucide-react";
-+
-+import { Badge } from "@/components/ui/badge";
-+import { Button } from "@/components/ui/button";
-+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-+import {
-+  Form,
-+  FormControl,
-+  FormField,
-+  FormItem,
-+  FormLabel,
-+  FormMessage,
-+} from "@/components/ui/form";
-+import { Input } from "@/components/ui/input";
-+import { Switch } from "@/components/ui/switch";
-+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-+import { Textarea } from "@/components/ui/textarea";
-+import { useToast } from "@/hooks/use-toast";
-+import { apiRequest, queryClient } from "@/lib/queryClient";
-+
-+const defaultFormValues: InsertBranch = {
-+  code: "",
-+  name: "",
-+  managerName: "",
-+  phone: "",
-+  email: "",
-+  address: "",
-+  city: "",
-+  country: "",
-+  isActive: 1,
-+};
-+
-+const optionalKeys: Array<keyof Pick<InsertBranch, "managerName" | "phone" | "email" | "address" | "city" | "country">> = [
-+  "managerName",
-+  "phone",
-+  "email",
-+  "address",
-+  "city",
-+  "country",
-+];
-+
-+function normalizeFormValues(values: InsertBranch): InsertBranch {
-+  const trimmed: InsertBranch = {
-+    ...values,
-+    code: values.code.trim(),
-+    name: values.name.trim(),
-+    isActive: values.isActive ?? 1,
-+  };
-+
-+  optionalKeys.forEach((key) => {
-+    const current = values[key];
-+    trimmed[key] = current ? current.trim() : "";
-+  });
-+
-+  return trimmed;
-+}
-+
-+export default function BranchesPage() {
-+  const { toast } = useToast();
-+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-+  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
-+
-+  const form = useForm<InsertBranch>({
-+    resolver: zodResolver(insertBranchSchema),
-+    defaultValues: defaultFormValues,
-+  });
-+
-+  const {
-+    data: branches = [],
-+    isLoading,
-+    isError,
-+    error,
-+  } = useQuery<Branch[]>({
-+    queryKey: ["/api/branches"],
-+  });
-+
-+  const selectedBranch = useMemo(() => {
-+    if (!selectedBranchId) {
-+      return null;
-+    }
-+    return branches.find((branch) => branch.id === selectedBranchId) ?? null;
-+  }, [branches, selectedBranchId]);
-+
-+  useEffect(() => {
-+    if (selectedBranch) {
-+      form.reset({
-+        code: selectedBranch.code,
-+        name: selectedBranch.name,
-+        managerName: selectedBranch.managerName ?? "",
-+        phone: selectedBranch.phone ?? "",
-+        email: selectedBranch.email ?? "",
-+        address: selectedBranch.address ?? "",
-+        city: selectedBranch.city ?? "",
-+        country: selectedBranch.country ?? "",
-+        isActive: selectedBranch.isActive ?? 1,
-+      });
-+    } else {
-+      form.reset(defaultFormValues);
-+    }
-+  }, [form, selectedBranch]);
-+
-+  const createBranchMutation = useMutation<Branch, Error, InsertBranch>({
-+    mutationFn: async (data) => {
-+      const response = await apiRequest("POST", "/api/branches", normalizeFormValues(data));
-+      return await response.json();
-+    },
-+    onSuccess: () => {
-+      queryClient.invalidateQueries({ queryKey: ["/api/branches"] });
-+      toast({
-+        title: "تم الحفظ بنجاح",
-+        description: "تم إضافة الفرع الجديد",
-+      });
-+      handleReset();
-+    },
-+    onError: (mutationError) => {
-+      toast({
-+        title: "خطأ",
-+        description: mutationError.message ?? "فشل في إضافة الفرع",
-+        variant: "destructive",
-+      });
-+    },
-+  });
-+
-+  const updateBranchMutation = useMutation<Branch, Error, { id: string; data: InsertBranch }>({
-+    mutationFn: async ({ id, data }) => {
-+      const response = await apiRequest("PUT", `/api/branches/${id}`, normalizeFormValues(data));
-+      return await response.json();
-+    },
-+    onSuccess: () => {
-+      queryClient.invalidateQueries({ queryKey: ["/api/branches"] });
-+      toast({
-+        title: "تم التحديث بنجاح",
-+        description: "تم تعديل بيانات الفرع",
-+      });
-+      handleReset();
-+    },
-+    onError: (mutationError) => {
-+      toast({
-+        title: "خطأ",
-+        description: mutationError.message ?? "فشل في تحديث الفرع",
-+        variant: "destructive",
-+      });
-+    },
-+  });
-+
-+  const deleteBranchMutation = useMutation<void, Error, string>({
-+    mutationFn: async (id) => {
-+      setDeletingBranchId(id);
-+      await apiRequest("DELETE", `/api/branches/${id}`);
-+    },
-+    onSuccess: () => {
-+      queryClient.invalidateQueries({ queryKey: ["/api/branches"] });
-+      toast({
-+        title: "تم الحذف",
-+        description: "تم حذف الفرع بنجاح",
-+      });
-+      if (selectedBranchId) {
-+        handleReset();
-+      }
-+    },
-+    onError: (mutationError) => {
-+      toast({
-+        title: "خطأ",
-+        description: mutationError.message ?? "فشل في حذف الفرع",
-+        variant: "destructive",
-+      });
-+    },
-+    onSettled: () => setDeletingBranchId(null),
-+  });
-+
-+  const isSaving = createBranchMutation.isPending || updateBranchMutation.isPending;
-+
-+  const handleSubmit = (values: InsertBranch) => {
-+    if (selectedBranchId) {
-+      updateBranchMutation.mutate({ id: selectedBranchId, data: values });
-+      return;
-+    }
-+    createBranchMutation.mutate(values);
-+  };
-+
-+  const handleReset = () => {
-+    setSelectedBranchId(null);
-+    form.reset(defaultFormValues);
-+  };
-+
-+  const handleEdit = (branchId: string) => {
-+    setSelectedBranchId(branchId);
-+  };
-+
-+  const handleDelete = (branch: Branch) => {
-+    if (confirm(`هل أنت متأكد من حذف الفرع "${branch.name}"؟`)) {
-+      deleteBranchMutation.mutate(branch.id);
-+    }
-+  };
-+
-+  return (
-+    <div className="space-y-6" data-testid="branches-page">
-+      <header className="flex flex-wrap items-center justify-between gap-4">
-+        <div className="flex items-center gap-3">
-+          <Building2 className="h-8 w-8 text-primary" />
-+          <div className="text-right">
-+            <h1 className="text-3xl font-bold" data-testid="branches-page-title">
-+              إدارة الفروع
-+            </h1>
-+            <p className="text-sm text-muted-foreground">
-+              متابعة بيانات الفروع ومعلومات الاتصال المرتبطة بها
-+            </p>
-+          </div>
-+        </div>
-+        <Button className="gap-2" size="lg" onClick={handleReset} data-testid="add-branch-button">
-+          <Plus className="h-4 w-4" />
-+          إضافة فرع جديد
-+        </Button>
-+      </header>
-+
-+      <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
-+        <BranchForm
-+          form={form}
-+          mode={selectedBranch ? "edit" : "create"}
-+          isSaving={isSaving}
-+          isDeleting={deleteBranchMutation.isPending}
-+          onSubmit={handleSubmit}
-+          onReset={handleReset}
-+          onDelete={() => selectedBranch && handleDelete(selectedBranch)}
-+          hasBranchSelected={Boolean(selectedBranch)}
-+        />
-+
-+        <BranchesTable
-+          branches={branches}
-+          selectedBranchId={selectedBranchId}
-+          isLoading={isLoading}
-+          isError={isError}
-+          error={error}
-+          onEdit={handleEdit}
-+          onDelete={handleDelete}
-+          isSaving={isSaving}
-+          deletingBranchId={deletingBranchId}
-+        />
-+      </div>
-+    </div>
-+  );
-+}
-+
-+interface BranchFormProps {
-+  form: UseFormReturn<InsertBranch>;
-+  mode: "create" | "edit";
-+  isSaving: boolean;
-+  isDeleting: boolean;
-+  onSubmit: (values: InsertBranch) => void;
-+  onReset: () => void;
-+  onDelete: () => void;
-+  hasBranchSelected: boolean;
-+}
-+
-+function BranchForm({
-+  form,
-+  mode,
-+  isSaving,
-+  isDeleting,
-+  onSubmit,
-+  onReset,
-+  onDelete,
-+  hasBranchSelected,
-+}: BranchFormProps) {
-+  return (
-+    <Card>
-+      <CardHeader>
-+        <CardTitle>{mode === "edit" ? "تعديل بيانات الفرع" : "إضافة فرع جديد"}</CardTitle>
-+        <CardDescription>
-+          أدخل معلومات الفرع لتسهيل التقارير وربط العمليات المحاسبية والمخزنية
-+        </CardDescription>
-+      </CardHeader>
-+      <CardContent>
-+        <Form {...form}>
-+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-+            <div className="grid gap-4">
-+              <FormField
-+                control={form.control}
-+                name="code"
-+                render={({ field }) => (
-+                  <FormItem>
-+                    <FormLabel>كود الفرع *</FormLabel>
-+                    <FormControl>
-+                      <Input placeholder="BR-001" autoComplete="off" {...field} />
-+                    </FormControl>
-+                    <FormMessage />
-+                  </FormItem>
-+                )}
-+              />
-+
-+              <FormField
-+                control={form.control}
-+                name="name"
-+                render={({ field }) => (
-+                  <FormItem>
-+                    <FormLabel>اسم الفرع *</FormLabel>
-+                    <FormControl>
-+                      <Input placeholder="الفرع الرئيسي" {...field} />
-+                    </FormControl>
-+                    <FormMessage />
-+                  </FormItem>
-+                )}
-+              />
-+
-+              <FormField
-+                control={form.control}
-+                name="managerName"
-+                render={({ field }) => (
-+                  <FormItem>
-+                    <FormLabel className="flex items-center gap-2">
-+                      <User className="h-4 w-4 text-muted-foreground" /> مدير الفرع
-+                    </FormLabel>
-+                    <FormControl>
-+                      <Input placeholder="اسم مدير الفرع" {...field} />
-+                    </FormControl>
-+                    <FormMessage />
-+                  </FormItem>
-+                )}
-+              />
-+
-+              <FormField
-+                control={form.control}
-+                name="phone"
-+                render={({ field }) => (
-+                  <FormItem>
-+                    <FormLabel className="flex items-center gap-2">
-+                      <Phone className="h-4 w-4 text-muted-foreground" /> رقم الهاتف
-+                    </FormLabel>
-+                    <FormControl>
-+                      <Input placeholder="+966 11 123 4567" {...field} />
-+                    </FormControl>
-+                    <FormMessage />
-+                  </FormItem>
-+                )}
-+              />
-+
-+              <FormField
-+                control={form.control}
-+                name="email"
-+                render={({ field }) => (
-+                  <FormItem>
-+                    <FormLabel className="flex items-center gap-2">
-+                      <Mail className="h-4 w-4 text-muted-foreground" /> البريد الإلكتروني
-+                    </FormLabel>
-+                    <FormControl>
-+                      <Input type="email" placeholder="branch@example.com" {...field} />
-+                    </FormControl>
-+                    <FormMessage />
-+                  </FormItem>
-+                )}
-+              />
-+
-+              <FormField
-+                control={form.control}
-+                name="address"
-+                render={({ field }) => (
-+                  <FormItem>
-+                    <FormLabel className="flex items-center gap-2">
-+                      <MapPin className="h-4 w-4 text-muted-foreground" /> العنوان التفصيلي
-+                    </FormLabel>
-+                    <FormControl>
-+                      <Textarea rows={3} placeholder="المدينة، الشارع، المبنى" {...field} />
-+                    </FormControl>
-+                    <FormMessage />
-+                  </FormItem>
-+                )}
-+              />
-+
-+              <div className="grid gap-4 sm:grid-cols-2">
-+                <FormField
-+                  control={form.control}
-+                  name="city"
-+                  render={({ field }) => (
-+                    <FormItem>
-+                      <FormLabel>المدينة</FormLabel>
-+                      <FormControl>
-+                        <Input placeholder="الرياض" {...field} />
-+                      </FormControl>
-+                      <FormMessage />
-+                    </FormItem>
-+                  )}
-+                />
-+
-+                <FormField
-+                  control={form.control}
-+                  name="country"
-+                  render={({ field }) => (
-+                    <FormItem>
-+                      <FormLabel>الدولة</FormLabel>
-+                      <FormControl>
-+                        <Input placeholder="المملكة العربية السعودية" {...field} />
-+                      </FormControl>
-+                      <FormMessage />
-+                    </FormItem>
-+                  )}
-+                />
-+              </div>
-+
-+              <FormField
-+                control={form.control}
-+                name="isActive"
-+                render={({ field }) => (
-+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
-+                    <FormLabel className="space-y-1">
-+                      <span className="block font-medium">حالة الفرع</span>
-+                      <span className="text-sm text-muted-foreground">
-+                        تحكم في ظهور الفرع في القوائم والتقارير
-+                      </span>
-+                    </FormLabel>
-+                    <FormControl>
-+                      <Switch
-+                        checked={field.value === 1}
-+                        onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
-+                      />
-+                    </FormControl>
-+                  </FormItem>
-+                )}
-+              />
-+            </div>
-+
-+            <div className="flex flex-wrap items-center justify-end gap-3">
-+              {hasBranchSelected && (
-+                <Button
-+                  type="button"
-+                  variant="outline"
-+                  className="gap-2"
-+                  onClick={onDelete}
-+                  disabled={isDeleting}
-+                >
-+                  {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-+                  حذف الفرع
-+                </Button>
-+              )}
-+              <Button
-+                type="button"
-+                variant="secondary"
-+                className="gap-2"
-+                onClick={onReset}
-+                disabled={isSaving}
-+              >
-+                <RotateCcw className="h-4 w-4" />
-+                إعادة تعيين
-+              </Button>
-+              <Button type="submit" className="gap-2" disabled={isSaving}>
-+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-+                {mode === "edit" ? "تحديث الفرع" : "حفظ الفرع"}
-+              </Button>
-+            </div>
-+          </form>
-+        </Form>
-+      </CardContent>
-+    </Card>
-+  );
-+}
-+
-+interface BranchesTableProps {
-+  branches: Branch[];
-+  selectedBranchId: string | null;
-+  isLoading: boolean;
-+  isError: boolean;
-+  error: unknown;
-+  onEdit: (branchId: string) => void;
-+  onDelete: (branch: Branch) => void;
-+  isSaving: boolean;
-+  deletingBranchId: string | null;
-+}
-+
-+function BranchesTable({
-+  branches,
-+  selectedBranchId,
-+  isLoading,
-+  isError,
-+  error,
-+  onEdit,
-+  onDelete,
-+  isSaving,
-+  deletingBranchId,
-+}: BranchesTableProps) {
-+  return (
-+    <Card className="overflow-hidden">
-+      <CardHeader>
-+        <CardTitle>قائمة الفروع</CardTitle>
-+        <CardDescription>
-+          {isLoading ? "جاري تحميل البيانات..." : "كل الفروع المسجلة ضمن النظام"}
-+        </CardDescription>
-+      </CardHeader>
-+      <CardContent className="p-0">
-+        <div className="overflow-x-auto">
-+          <Table>
-+            <TableHeader>
-+              <TableRow>
-+                <TableHead className="text-right">الكود</TableHead>
-+                <TableHead className="text-right">اسم الفرع</TableHead>
-+                <TableHead className="text-right">المدينة</TableHead>
-+                <TableHead className="text-right">الهاتف</TableHead>
-+                <TableHead className="text-right">الحالة</TableHead>
-+                <TableHead className="text-right">إجراءات</TableHead>
-+              </TableRow>
-+            </TableHeader>
-+            <TableBody>
-+              {isLoading && (
-+                <TableRow>
-+                  <TableCell colSpan={6} className="text-center">
-+                    <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
-+                      <Loader2 className="h-4 w-4 animate-spin" />
-+                      جاري تحميل الفروع...
-+                    </div>
-+                  </TableCell>
-+                </TableRow>
-+              )}
-+
-+              {isError && !isLoading && (
-+                <TableRow>
-+                  <TableCell colSpan={6} className="text-center text-destructive">
-+                    حدث خطأ أثناء تحميل الفروع: {error instanceof Error ? error.message : ""}
-+                  </TableCell>
-+                </TableRow>
-+              )}
-+
-+              {!isLoading && !isError && branches.length === 0 && (
-+                <TableRow>
-+                  <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
-+                    لم يتم إضافة أي فروع بعد
-+                  </TableCell>
-+                </TableRow>
-+              )}
-+
-+              {!isLoading && !isError &&
-+                branches.map((branch) => {
-+                  const isSelected = selectedBranchId === branch.id;
-+                  const isDeleting = deletingBranchId === branch.id;
-+
-+                  return (
-+                    <TableRow key={branch.id} data-state={isSelected ? "selected" : undefined}>
-+                      <TableCell className="font-medium text-right">{branch.code}</TableCell>
-+                      <TableCell className="text-right">{branch.name}</TableCell>
-+                      <TableCell className="text-right">{branch.city ?? "-"}</TableCell>
-+                      <TableCell className="text-right">{branch.phone ?? "-"}</TableCell>
-+                      <TableCell className="text-right">
-+                        <Badge
-+                          variant={branch.isActive === 1 ? "default" : "secondary"}
-+                          className={branch.isActive === 1 ? undefined : "text-muted-foreground"}
-+                        >
-+                          {branch.isActive === 1 ? "نشط" : "موقوف"}
-+                        </Badge>
-+                      </TableCell>
-+                      <TableCell>
-+                        <div className="flex justify-end gap-2">
-+                          <Button
-+                            type="button"
-+                            size="sm"
-+                            variant="outline"
-+                            onClick={() => onEdit(branch.id)}
-+                            disabled={isSaving && !isSelected}
-+                          >
-+                            تعديل
-+                          </Button>
-+                          <Button
-+                            type="button"
-+                            size="sm"
-+                            variant="ghost"
-+                            className="text-destructive"
-+                            onClick={() => onDelete(branch)}
-+                            disabled={isDeleting}
-+                          >
-+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-+                            حذف
-+                          </Button>
-+                        </div>
-+                      </TableCell>
-+                    </TableRow>
-+                  );
-+                })}
-+            </TableBody>
-+          </Table>
-+        </div>
-+      </CardContent>
-+    </Card>
-+  );
-+}
- 
-EOF
-)
+import type { Express, Request, Response, NextFunction } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import {
+  insertAccountSchema,
+  insertFullEntrySchema,
+  insertProductSchema,
+  insertBranchSchema,
+  insertCustomerSchema,
+  insertSupplierSchema,
+  insertFullSalesInvoiceSchema,
+  insertFullReceiptVoucherSchema,
+  insertFullPaymentVoucherSchema,
+} from "@shared/schema";
+import { z } from "zod";
+import { AppError } from "./errors";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Accounts Routes
+  app.get("/api/accounts", async (_req, res) => {
+    try {
+      const accounts = await storage.getAccounts();
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      res.status(500).json({ error: "فشل في جلب الحسابات" });
+    }
+  });
+
+  app.get("/api/accounts/:id", async (req, res) => {
+    try {
+      const account = await storage.getAccount(req.params.id);
+      if (!account) {
+        return res.status(404).json({ error: "الحساب غير موجود" });
+      }
+      res.json(account);
+    } catch (error) {
+      console.error("Error fetching account:", error);
+      res.status(500).json({ error: "فشل في جلب الحساب" });
+    }
+  });
+
+  app.post("/api/accounts", async (req, res) => {
+    try {
+      const validatedData = insertAccountSchema.parse(req.body);
+
+      // Check if account code already exists
+      const existing = await storage.getAccountByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "رمز الحساب موجود بالفعل" });
+      }
+
+      const account = await storage.createAccount(validatedData);
+      res.status(201).json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating account:", error);
+      res.status(500).json({ error: "فشل في إنشاء الحساب" });
+    }
+  });
+
+  app.put("/api/accounts/:id", async (req, res) => {
+    try {
+      const validatedData = insertAccountSchema.partial().parse(req.body);
+      const account = await storage.updateAccount(req.params.id, validatedData);
+
+      if (!account) {
+        return res.status(404).json({ error: "الحساب غير موجود" });
+      }
+
+      res.json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error updating account:", error);
+      res.status(500).json({ error: "فشل في تحديث الحساب" });
+    }
+  });
+
+  app.delete("/api/accounts/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAccount(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الحساب غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ error: "فشل في حذف الحساب" });
+    }
+  });
+
+  // Entries Routes
+  app.get("/api/entries", async (_req, res) => {
+    try {
+      const entries = await storage.getEntries();
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching entries:", error);
+      res.status(500).json({ error: "فشل في جلب القيود" });
+    }
+  });
+
+  app.get("/api/entries/:id", async (req, res) => {
+    try {
+      const entry = await storage.getEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: "القيد غير موجود" });
+      }
+      res.json(entry);
+    } catch (error) {
+      console.error("Error fetching entry:", error);
+      res.status(500).json({ error: "فشل في جلب القيد" });
+    }
+  });
+
+  app.post("/api/entries", async (req, res) => {
+    try {
+      const validatedData = insertFullEntrySchema.parse(req.body);
+
+      // Validate that entry is balanced
+      const totalDebit = validatedData.lines.reduce(
+        (sum, line) => sum + Number(line.debit || 0),
+        0
+      );
+      const totalCredit = validatedData.lines.reduce(
+        (sum, line) => sum + Number(line.credit || 0),
+        0
+      );
+
+      if (totalDebit !== totalCredit) {
+        return res.status(400).json({
+          error: "القيد غير متوازن - المدين لا يساوي الدائن"
+        });
+      }
+
+      if (totalDebit === 0) {
+        return res.status(400).json({
+          error: "القيد يجب أن يحتوي على مبالغ"
+        });
+      }
+
+      // Create entry
+      const entry = await storage.createEntry(
+        {
+          entryNumber: validatedData.entryNumber,
+          date: validatedData.date,
+          description: validatedData.description,
+        },
+        validatedData.lines
+      );
+
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating entry:", error);
+      res.status(500).json({ error: "فشل في إنشاء القيد" });
+    }
+  });
+
+  app.delete("/api/entries/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteEntry(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "القيد غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting entry:", error);
+      res.status(500).json({ error: "فشل في حذف القيد" });
+    }
+  });
+
+  // Reports Routes
+  app.get("/api/trial-balance", async (_req, res) => {
+    try {
+      const trialBalance = await storage.getTrialBalance();
+      res.json(trialBalance);
+    } catch (error) {
+      console.error("Error fetching trial balance:", error);
+      res.status(500).json({ error: "فشل في جلب ميزان المراجعة" });
+    }
+  });
+
+  app.get("/api/reports/income-statement", async (req, res) => {
+    try {
+      const from = req.query.from
+        ? new Date(req.query.from as string)
+        : new Date(new Date().getFullYear(), 0, 1);
+      const to = req.query.to
+        ? new Date(req.query.to as string)
+        : new Date();
+
+      const incomeStatement = await storage.getIncomeStatement(from, to);
+      res.json(incomeStatement);
+    } catch (error) {
+      console.error("Error fetching income statement:", error);
+      res.status(500).json({ error: "فشل في جلب قائمة الدخل" });
+    }
+  });
+
+  app.get("/api/reports/balance-sheet", async (req, res) => {
+    try {
+      const date = req.query.date
+        ? new Date(req.query.date as string)
+        : new Date();
+
+      const balanceSheet = await storage.getBalanceSheet(date);
+      res.json(balanceSheet);
+    } catch (error) {
+      console.error("Error fetching balance sheet:", error);
+      res.status(500).json({ error: "فشل في جلب الميزانية العمومية" });
+    }
+  });
+
+  // Dashboard Routes
+  app.get("/api/dashboard/stats", async (_req, res) => {
+    try {
+      const stats = await storage.getDashboardStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ error: "فشل في جلب الإحصائيات" });
+    }
+  });
+
+  // Products Routes
+  app.get("/api/products", async (_req, res) => {
+    try {
+      const products = await storage.getProducts();
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ error: "فشل في جلب الأصناف" });
+    }
+  });
+
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: "الصنف غير موجود" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error fetching product:", error);
+      res.status(500).json({ error: "فشل في جلب الصنف" });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const validatedData = insertProductSchema.parse(req.body);
+
+      // Check if product code already exists
+      const existing = await storage.getProductByCode(validatedData.itemCode);
+      if (existing) {
+        return res.status(400).json({ error: "كود الصنف موجود بالفعل" });
+      }
+
+      const product = await storage.createProduct(validatedData);
+      res.status(201).json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating product:", error);
+      res.status(500).json({ error: "فشل في إنشاء الصنف" });
+    }
+  });
+
+  app.put("/api/products/:id", async (req, res) => {
+    try {
+      const validatedData = insertProductSchema.partial().parse(req.body);
+      const product = await storage.updateProduct(req.params.id, validatedData);
+
+      if (!product) {
+        return res.status(404).json({ error: "الصنف غير موجود" });
+      }
+
+      res.json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error updating product:", error);
+      res.status(500).json({ error: "فشل في تحديث الصنف" });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteProduct(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الصنف غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ error: "فشل في حذف الصنف" });
+    }
+  });
+
+  // Branches Routes
+  app.get("/api/branches", async (_req, res) => {
+    try {
+      const allBranches = await storage.getBranches();
+      res.json(allBranches);
+    } catch (error) {
+      console.error("Error fetching branches:", error);
+      res.status(500).json({ error: "فشل في جلب الفروع" });
+    }
+  });
+
+  app.get("/api/branches/:id", async (req, res) => {
+    try {
+      const branch = await storage.getBranch(req.params.id);
+      if (!branch) {
+        return res.status(404).json({ error: "الفرع غير موجود" });
+      }
+      res.json(branch);
+    } catch (error) {
+      console.error("Error fetching branch:", error);
+      res.status(500).json({ error: "فشل في جلب الفرع" });
+    }
+  });
+
+  app.post("/api/branches", async (req, res) => {
+    try {
+      const validatedData = insertBranchSchema.parse(req.body);
+
+      const existing = await storage.getBranchByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "كود الفرع موجود بالفعل" });
+      }
+
+      const branch = await storage.createBranch(validatedData);
+      res.status(201).json(branch);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating branch:", error);
+      res.status(500).json({ error: "فشل في إنشاء الفرع" });
+    }
+  });
+
+  app.put("/api/branches/:id", async (req, res) => {
+    try {
+      const validatedData = insertBranchSchema.partial().parse(req.body);
+
+      if (validatedData.code) {
+        const existing = await storage.getBranchByCode(validatedData.code);
+        if (existing && existing.id !== req.params.id) {
+          return res.status(400).json({ error: "كود الفرع مستخدم في فرع آخر" });
+        }
+      }
+
+      const branch = await storage.updateBranch(req.params.id, validatedData);
+
+      if (!branch) {
+        return res.status(404).json({ error: "الفرع غير موجود" });
+      }
+
+      res.json(branch);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error updating branch:", error);
+      res.status(500).json({ error: "فشل في تحديث الفرع" });
+    }
+  });
+
+  app.delete("/api/branches/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBranch(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الفرع غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting branch:", error);
+      res.status(500).json({ error: "فشل في حذف الفرع" });
+    }
+  });
+
+  // Customers Routes
+  app.get("/api/customers", async (_req, res) => {
+    try {
+      const customers = await storage.getCustomers();
+      res.json(customers);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ error: "فشل في جلب العملاء" });
+    }
+  });
+
+  app.get("/api/customers/:id", async (req, res) => {
+    try {
+      const customer = await storage.getCustomer(req.params.id);
+      if (!customer) {
+        return res.status(404).json({ error: "العميل غير موجود" });
+      }
+      res.json(customer);
+    } catch (error) {
+      console.error("Error fetching customer:", error);
+      res.status(500).json({ error: "فشل في جلب العميل" });
+    }
+  });
+
+  app.post("/api/customers", async (req, res) => {
+    try {
+      const validatedData = insertCustomerSchema.parse(req.body);
+
+      // Check if customer code already exists
+      const existing = await storage.getCustomerByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "كود العميل موجود بالفعل" });
+      }
+
+      const customer = await storage.createCustomer(validatedData);
+      res.status(201).json(customer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating customer:", error);
+      res.status(500).json({ error: "فشل في إنشاء العميل" });
+    }
+  });
+
+  app.put("/api/customers/:id", async (req, res) => {
+    try {
+      const validatedData = insertCustomerSchema.partial().parse(req.body);
+      const customer = await storage.updateCustomer(req.params.id, validatedData);
+
+      if (!customer) {
+        return res.status(404).json({ error: "العميل غير موجود" });
+      }
+
+      res.json(customer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error updating customer:", error);
+      res.status(500).json({ error: "فشل في تحديث العميل" });
+    }
+  });
+
+  app.delete("/api/customers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteCustomer(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "العميل غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      res.status(500).json({ error: "فشل في حذف العميل" });
+    }
+  });
+
+  // Suppliers Routes
+  app.get("/api/suppliers", async (_req, res) => {
+    try {
+      const suppliers = await storage.getSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      res.status(500).json({ error: "فشل في جلب الموردين" });
+    }
+  });
+
+  app.get("/api/suppliers/:id", async (req, res) => {
+    try {
+      const supplier = await storage.getSupplier(req.params.id);
+      if (!supplier) {
+        return res.status(404).json({ error: "المورد غير موجود" });
+      }
+      res.json(supplier);
+    } catch (error) {
+      console.error("Error fetching supplier:", error);
+      res.status(500).json({ error: "فشل في جلب المورد" });
+    }
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      const validatedData = insertSupplierSchema.parse(req.body);
+
+      // Check if supplier code already exists
+      const existing = await storage.getSupplierByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "كود المورد موجود بالفعل" });
+      }
+
+      const supplier = await storage.createSupplier(validatedData);
+      res.status(201).json(supplier);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating supplier:", error);
+      res.status(500).json({ error: "فشل في إنشاء المورد" });
+    }
+  });
+
+  app.put("/api/suppliers/:id", async (req, res) => {
+    try {
+      const validatedData = insertSupplierSchema.partial().parse(req.body);
+      const supplier = await storage.updateSupplier(req.params.id, validatedData);
+
+      if (!supplier) {
+        return res.status(404).json({ error: "المورد غير موجود" });
+      }
+
+      res.json(supplier);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error updating supplier:", error);
+      res.status(500).json({ error: "فشل في تحديث المورد" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSupplier(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "المورد غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      res.status(500).json({ error: "فشل في حذف المورد" });
+    }
+  });
+
+  // Sales Invoices Routes
+  app.get("/api/sales-invoices", async (req, res) => {
+    try {
+      const filters: any = {};
+
+      if (req.query.status) {
+        filters.status = req.query.status as string;
+      }
+      if (req.query.customerId) {
+        filters.customerId = req.query.customerId as string;
+      }
+      if (req.query.from) {
+        filters.from = new Date(req.query.from as string);
+      }
+      if (req.query.to) {
+        filters.to = new Date(req.query.to as string);
+      }
+
+      const invoices = await storage.getSalesInvoices(filters);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching sales invoices:", error);
+      res.status(500).json({ error: "فشل في جلب الفواتير" });
+    }
+  });
+
+  app.get("/api/sales-invoices/:id", async (req, res) => {
+    try {
+      const invoice = await storage.getSalesInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "الفاتورة غير موجودة" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching sales invoice:", error);
+      res.status(500).json({ error: "فشل في جلب الفاتورة" });
+    }
+  });
+
+  app.post("/api/sales-invoices", async (req, res) => {
+    try {
+      const validatedData = insertFullSalesInvoiceSchema.parse(req.body);
+
+      // Check if invoice number already exists
+      const allInvoices = await storage.getSalesInvoices();
+      const existing = allInvoices.find(inv => inv.invoiceNumber === validatedData.invoiceNumber);
+      if (existing) {
+        return res.status(400).json({ error: "رقم الفاتورة موجود بالفعل" });
+      }
+
+      const invoice = await storage.createSalesInvoiceDraft(validatedData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating sales invoice:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في إنشاء الفاتورة"
+      });
+    }
+  });
+
+  app.put("/api/sales-invoices/:id", async (req, res) => {
+    try {
+      const validatedData = insertFullSalesInvoiceSchema.parse(req.body);
+      const invoice = await storage.updateSalesInvoiceDraft(req.params.id, validatedData);
+      res.json(invoice);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error updating sales invoice:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في تحديث الفاتورة"
+      });
+    }
+  });
+
+  app.delete("/api/sales-invoices/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSalesInvoiceDraft(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الفاتورة غير موجودة" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting sales invoice:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في حذف الفاتورة"
+      });
+    }
+  });
+
+  app.post("/api/sales-invoices/:id/post", async (req, res) => {
+    try {
+      const invoice = await storage.postSalesInvoice(req.params.id);
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error posting sales invoice:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في نشر الفاتورة"
+      });
+    }
+  });
+
+  // Receipt Voucher routes
+  app.get("/api/receipt-vouchers", async (_req, res) => {
+    try {
+      const vouchers = await storage.getReceiptVouchers();
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching receipt vouchers:", error);
+      res.status(500).json({ error: "فشل في جلب سندات القبض" });
+    }
+  });
+
+  app.get("/api/receipt-vouchers/:id", async (req, res) => {
+    try {
+      const voucher = await storage.getReceiptVoucher(req.params.id);
+      if (!voucher) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json(voucher);
+    } catch (error) {
+      console.error("Error fetching receipt voucher:", error);
+      res.status(500).json({ error: "فشل في جلب السند" });
+    }
+  });
+
+  app.post("/api/receipt-vouchers", async (req, res) => {
+    try {
+      const validatedData = insertFullReceiptVoucherSchema.parse(req.body);
+
+      // Check if voucher number already exists
+      const allVouchers = await storage.getReceiptVouchers();
+      const existing = allVouchers.find(v => v.voucherNumber === validatedData.voucherNumber);
+      if (existing) {
+        return res.status(400).json({ error: "رقم السند موجود بالفعل" });
+      }
+
+      const voucher = await storage.createReceiptVoucherDraft(validatedData);
+      res.status(201).json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error creating receipt voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في إنشاء السند"
+      });
+    }
+  });
+
+  app.put("/api/receipt-vouchers/:id", async (req, res) => {
+    try {
+      const validatedData = insertFullReceiptVoucherSchema.parse(req.body);
+      const voucher = await storage.updateReceiptVoucherDraft(req.params.id, validatedData);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error updating receipt voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في تحديث السند"
+      });
+    }
+  });
+
+  app.delete("/api/receipt-vouchers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteReceiptVoucherDraft(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error deleting receipt voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في حذف السند"
+      });
+    }
+  });
+
+  app.post("/api/receipt-vouchers/:id/post", async (req, res) => {
+    try {
+      const voucher = await storage.postReceiptVoucher(req.params.id);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error posting receipt voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في نشر السند"
+      });
+    }
+  });
+
+  // Payment Voucher routes
+  app.get("/api/payment-vouchers", async (_req, res) => {
+    try {
+      const vouchers = await storage.getPaymentVouchers();
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching payment vouchers:", error);
+      res.status(500).json({ error: "فشل في جلب سندات الدفع" });
+    }
+  });
+
+  app.get("/api/payment-vouchers/:id", async (req, res) => {
+    try {
+      const voucher = await storage.getPaymentVoucher(req.params.id);
+      if (!voucher) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json(voucher);
+    } catch (error) {
+      console.error("Error fetching payment voucher:", error);
+      res.status(500).json({ error: "فشل في جلب السند" });
+    }
+  });
+
+  app.post("/api/payment-vouchers", async (req, res) => {
+    try {
+      const validatedData = insertFullPaymentVoucherSchema.parse(req.body);
+
+      // Check if voucher number already exists
+      const allVouchers = await storage.getPaymentVouchers();
+      const existing = allVouchers.find(v => v.voucherNumber === validatedData.voucherNumber);
+      if (existing) {
+        return res.status(400).json({ error: "رقم السند موجود بالفعل" });
+      }
+
+      const voucher = await storage.createPaymentVoucherDraft(validatedData);
+      res.status(201).json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error creating payment voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في إنشاء السند"
+      });
+    }
+  });
+
+  app.put("/api/payment-vouchers/:id", async (req, res) => {
+    try {
+      const validatedData = insertFullPaymentVoucherSchema.parse(req.body);
+      const voucher = await storage.updatePaymentVoucherDraft(req.params.id, validatedData);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error updating payment voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في تحديث السند"
+      });
+    }
+  });
+
+  app.delete("/api/payment-vouchers/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePaymentVoucherDraft(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "السند غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error deleting payment voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في حذف السند"
+      });
+    }
+  });
+
+  app.post("/api/payment-vouchers/:id/post", async (req, res) => {
+    try {
+      const voucher = await storage.postPaymentVoucher(req.params.id);
+      res.json(voucher);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error posting payment voucher:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في نشر السند"
+      });
+    }
+  });
+
+  // Centralized error handling middleware
+  // MUST be added after all routes
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    // Handle AppError instances (ValidationError, NotFoundError, etc.)
+    if (err instanceof AppError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code
+      });
+    }
+
+    // Handle Zod validation errors
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        error: "بيانات غير صحيحة",
+        details: err.errors
+      });
+    }
+
+    // Unknown errors - log and return 500
+    console.error("Unhandled error:", err);
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "حدث خطأ في الخادم"
+    });
+  });
+
+  const httpServer = createServer(app);
+
+  return httpServer;
+}
