@@ -209,10 +209,11 @@ export const branches = pgTable("branches", {
 });
 
 // Schema للإدراج - الفروع
-export const insertBranchSchema = createInsertSchema(branches, {
-  code: (schema) => schema.code.min(1, "كود الفرع مطلوب"),
-  name: (schema) => schema.name.min(1, "اسم الفرع مطلوب"),
-  email: (schema) => schema.email.email("بريد إلكتروني غير صحيح").optional().or(z.literal("")),
+// الجزء الصحيح
+export const insertBranchSchema = createInsertSchema(branches).extend({
+  code: z.string().min(1, "كود الفرع مطلوب"),
+  name: z.string().min(1, "اسم الفرع مطلوب"),
+  email: z.string().email("بريد إلكتروني غير صحيح").optional().or(z.literal("")),
 }).omit({
   id: true,
   createdAt: true,
