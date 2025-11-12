@@ -189,6 +189,38 @@ export const insertProductSchema = createInsertSchema(products).omit({
 // أنواع TypeScript - المنتجات
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
+// ==========================================
+// Branches (الفروع)
+// ==========================================
+
+// جدول الفروع
+export const branches = pgTable("branches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+  name: text("name").notNull(),
+  managerName: text("manager_name"),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 100 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  country: varchar("country", { length: 100 }),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Schema للإدراج - الفروع
+export const insertBranchSchema = createInsertSchema(branches, {
+  code: (schema) => schema.code.min(1, "كود الفرع مطلوب"),
+  name: (schema) => schema.name.min(1, "اسم الفرع مطلوب"),
+  email: (schema) => schema.email.email("بريد إلكتروني غير صحيح").optional().or(z.literal("")),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+// أنواع TypeScript - الفروع
+export type InsertBranch = z.infer<typeof insertBranchSchema>;
+export type Branch = typeof branches.$inferSelect;
 
 // جدول العملاء
 export const customers = pgTable("customers", {
