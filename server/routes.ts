@@ -5,16 +5,12 @@ import {
   insertAccountSchema,
   insertFullEntrySchema,
   insertProductSchema,
+  insertBranchSchema,
   insertCustomerSchema,
   insertSupplierSchema,
   insertFullSalesInvoiceSchema,
   insertFullReceiptVoucherSchema,
   insertFullPaymentVoucherSchema,
-  type InsertAccount,
-  type InsertFullEntry,
-  type InsertProduct,
-  type InsertCustomer,
-  type InsertFullSalesInvoice,
 } from "@shared/schema";
 import { z } from "zod";
 import { AppError } from "./errors";
@@ -58,9 +54,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(account);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error creating account:", error);
@@ -72,17 +68,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertAccountSchema.partial().parse(req.body);
       const account = await storage.updateAccount(req.params.id, validatedData);
-      
+
       if (!account) {
         return res.status(404).json({ error: "الحساب غير موجود" });
       }
-      
+
       res.json(account);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error updating account:", error);
@@ -142,14 +138,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (totalDebit !== totalCredit) {
-        return res.status(400).json({ 
-          error: "القيد غير متوازن - المدين لا يساوي الدائن" 
+        return res.status(400).json({
+          error: "القيد غير متوازن - المدين لا يساوي الدائن"
         });
       }
 
       if (totalDebit === 0) {
-        return res.status(400).json({ 
-          error: "القيد يجب أن يحتوي على مبالغ" 
+        return res.status(400).json({
+          error: "القيد يجب أن يحتوي على مبالغ"
         });
       }
 
@@ -166,9 +162,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(entry);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error creating entry:", error);
@@ -202,11 +198,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/reports/income-statement", async (req, res) => {
     try {
-      const from = req.query.from 
-        ? new Date(req.query.from as string) 
+      const from = req.query.from
+        ? new Date(req.query.from as string)
         : new Date(new Date().getFullYear(), 0, 1);
-      const to = req.query.to 
-        ? new Date(req.query.to as string) 
+      const to = req.query.to
+        ? new Date(req.query.to as string)
         : new Date();
 
       const incomeStatement = await storage.getIncomeStatement(from, to);
@@ -219,8 +215,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/reports/balance-sheet", async (req, res) => {
     try {
-      const date = req.query.date 
-        ? new Date(req.query.date as string) 
+      const date = req.query.date
+        ? new Date(req.query.date as string)
         : new Date();
 
       const balanceSheet = await storage.getBalanceSheet(date);
@@ -280,9 +276,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(product);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error creating product:", error);
@@ -294,17 +290,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertProductSchema.partial().parse(req.body);
       const product = await storage.updateProduct(req.params.id, validatedData);
-      
+
       if (!product) {
         return res.status(404).json({ error: "الصنف غير موجود" });
       }
-      
+
       res.json(product);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error updating product:", error);
@@ -322,6 +318,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting product:", error);
       res.status(500).json({ error: "فشل في حذف الصنف" });
+    }
+  });
+
+  // Branches Routes
+  app.get("/api/branches", async (_req, res) => {
+    try {
+      const allBranches = await storage.getBranches();
+      res.json(allBranches);
+    } catch (error) {
+      console.error("Error fetching branches:", error);
+      res.status(500).json({ error: "فشل في جلب الفروع" });
+    }
+  });
+
+  app.get("/api/branches/:id", async (req, res) => {
+    try {
+      const branch = await storage.getBranch(req.params.id);
+      if (!branch) {
+        return res.status(404).json({ error: "الفرع غير موجود" });
+      }
+      res.json(branch);
+    } catch (error) {
+      console.error("Error fetching branch:", error);
+      res.status(500).json({ error: "فشل في جلب الفرع" });
+    }
+  });
+
+  app.post("/api/branches", async (req, res) => {
+    try {
+      const validatedData = insertBranchSchema.parse(req.body);
+
+      const existing = await storage.getBranchByCode(validatedData.code);
+      if (existing) {
+        return res.status(400).json({ error: "كود الفرع موجود بالفعل" });
+      }
+
+      const branch = await storage.createBranch(validatedData);
+      res.status(201).json(branch);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error creating branch:", error);
+      res.status(500).json({ error: "فشل في إنشاء الفرع" });
+    }
+  });
+
+  app.put("/api/branches/:id", async (req, res) => {
+    try {
+      const validatedData = insertBranchSchema.partial().parse(req.body);
+
+      if (validatedData.code) {
+        const existing = await storage.getBranchByCode(validatedData.code);
+        if (existing && existing.id !== req.params.id) {
+          return res.status(400).json({ error: "كود الفرع مستخدم في فرع آخر" });
+        }
+      }
+
+      const branch = await storage.updateBranch(req.params.id, validatedData);
+
+      if (!branch) {
+        return res.status(404).json({ error: "الفرع غير موجود" });
+      }
+
+      res.json(branch);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "بيانات غير صحيحة",
+          details: error.errors
+        });
+      }
+      console.error("Error updating branch:", error);
+      res.status(500).json({ error: "فشل في تحديث الفرع" });
+    }
+  });
+
+  app.delete("/api/branches/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteBranch(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "الفرع غير موجود" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting branch:", error);
+      res.status(500).json({ error: "فشل في حذف الفرع" });
     }
   });
 
@@ -363,9 +449,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(customer);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error creating customer:", error);
@@ -377,17 +463,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertCustomerSchema.partial().parse(req.body);
       const customer = await storage.updateCustomer(req.params.id, validatedData);
-      
+
       if (!customer) {
         return res.status(404).json({ error: "العميل غير موجود" });
       }
-      
+
       res.json(customer);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error updating customer:", error);
@@ -446,9 +532,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(supplier);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error creating supplier:", error);
@@ -460,17 +546,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertSupplierSchema.partial().parse(req.body);
       const supplier = await storage.updateSupplier(req.params.id, validatedData);
-      
+
       if (!supplier) {
         return res.status(404).json({ error: "المورد غير موجود" });
       }
-      
+
       res.json(supplier);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error updating supplier:", error);
@@ -495,7 +581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sales-invoices", async (req, res) => {
     try {
       const filters: any = {};
-      
+
       if (req.query.status) {
         filters.status = req.query.status as string;
       }
@@ -545,14 +631,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(invoice);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error creating sales invoice:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في إنشاء الفاتورة" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في إنشاء الفاتورة"
       });
     }
   });
@@ -564,14 +650,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(invoice);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       console.error("Error updating sales invoice:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في تحديث الفاتورة" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في تحديث الفاتورة"
       });
     }
   });
@@ -585,8 +671,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting sales invoice:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في حذف الفاتورة" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في حذف الفاتورة"
       });
     }
   });
@@ -597,8 +683,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(invoice);
     } catch (error) {
       console.error("Error posting sales invoice:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في نشر الفاتورة" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في نشر الفاتورة"
       });
     }
   });
@@ -642,17 +728,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(voucher);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       if (error instanceof AppError) {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error creating receipt voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في إنشاء السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في إنشاء السند"
       });
     }
   });
@@ -664,17 +750,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(voucher);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       if (error instanceof AppError) {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error updating receipt voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في تحديث السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في تحديث السند"
       });
     }
   });
@@ -691,8 +777,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error deleting receipt voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في حذف السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في حذف السند"
       });
     }
   });
@@ -706,8 +792,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error posting receipt voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في نشر السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في نشر السند"
       });
     }
   });
@@ -751,17 +837,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(voucher);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       if (error instanceof AppError) {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error creating payment voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في إنشاء السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في إنشاء السند"
       });
     }
   });
@@ -773,17 +859,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(voucher);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "بيانات غير صحيحة",
-          details: error.errors 
+          details: error.errors
         });
       }
       if (error instanceof AppError) {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error updating payment voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في تحديث السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في تحديث السند"
       });
     }
   });
@@ -800,8 +886,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error deleting payment voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في حذف السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في حذف السند"
       });
     }
   });
@@ -815,8 +901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(error.status).json({ error: error.message });
       }
       console.error("Error posting payment voucher:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "فشل في نشر السند" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "فشل في نشر السند"
       });
     }
   });
@@ -826,24 +912,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     // Handle AppError instances (ValidationError, NotFoundError, etc.)
     if (err instanceof AppError) {
-      return res.status(err.status).json({ 
+      return res.status(err.status).json({
         error: err.message,
-        code: err.code 
+        code: err.code
       });
     }
 
     // Handle Zod validation errors
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "بيانات غير صحيحة",
-        details: err.errors 
+        details: err.errors
       });
     }
 
     // Unknown errors - log and return 500
     console.error("Unhandled error:", err);
-    res.status(500).json({ 
-      error: err instanceof Error ? err.message : "حدث خطأ في الخادم" 
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "حدث خطأ في الخادم"
     });
   });
 
