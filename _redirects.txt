@@ -1,0 +1,14 @@
+# --- SPA routing ---
+/*    /index.html    200
+
+# --- Force HTTPS ---
+http://*    https://:splat    301!
+
+# --- Remove trailing slashes ---
+/*/    /:splat    301!
+
+# --- Example of custom redirect (اختياري) ---
+# /old-page    /new-page    301
+
+# --- API fallback (اختياري للمشاريع التي تستخدم API محلية) ---
+# /api/*    /.netlify/functions/:splat    200
